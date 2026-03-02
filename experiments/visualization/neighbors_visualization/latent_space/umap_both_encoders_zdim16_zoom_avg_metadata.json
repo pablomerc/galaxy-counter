@@ -1,0 +1,8 @@
+{
+  "epoch": 75000,
+  "dim": 16,
+  "mode_tag": "",
+  "zoom_val": true,
+  "avg_latent_space": true,
+  "num_hsc": 2048
+}
