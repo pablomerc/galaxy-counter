@@ -1,0 +1,9 @@
+# Copy to configs/paths.yaml and adapt to your environment.
+neighbors_h5: /path/to/neighbours_v2.h5
+precomputed_neighbors_h5: /path/to/neighbours_vds.h5
+mmu_images_h5: /path/to/preprocessed_hsc_legacy_48x48_all.h5
+mmu_metadata_h5: /path/to/preprocessed_hsc_legacy_metadata_8192.h5
+provabgs_train_fits: /path/to/provabgs_legacysurvey_train_v2.fits
+provabgs_eval_fits: /path/to/provabgs_legacysurvey_eval_v2.fits
+hsc_provabgs_train_fits: /path/to/provabgs_hsc_train_v2.fits
+checkpoint_dir: ./outputs

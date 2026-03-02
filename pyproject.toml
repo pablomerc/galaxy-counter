@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "galaxy-counter"
+version = "0.1.0"
+description = "Cleaned galaxy-counter core pipeline extracted from tess-generative"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "pandas",
+  "h5py",
+  "torch",
+  "pytorch-lightning",
+  "scikit-learn",
+  "matplotlib",
+  "tqdm",
+  "astropy",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

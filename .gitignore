@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Environments
+.venv/
+venv/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs and artifacts
+wandb/
+runs/
+lightning_logs/
+logs/
+*.log
+
+# Model/data artifacts
+*.ckpt
+*.pt
+*.pth
+*.h5
+*.hdf5
+*.npz
+*.npy
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
