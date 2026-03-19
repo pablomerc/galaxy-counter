@@ -33,6 +33,3 @@ scripts/run_downstream_predict.sh --suffix myrun
 scripts/run_neighbor_search.sh --checkpoint /path/to/model.ckpt --module double_train_fm_neighbors.py --suffix myrun
 ```
 
-## Notes
-- Gemini helper scripts were excluded.
-- Large generated artifacts are gitignored (`*.ckpt`, `*.h5`, plots, logs, `wandb/`).
