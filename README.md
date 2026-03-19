@@ -16,8 +16,6 @@ Refactored core galaxy-counter code extracted from `tess-generative`, focused on
 
 ## Setup
 ```bash
-pip install -e .
-# or
 pip install -r requirements.txt
 ```
 
