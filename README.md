@@ -15,9 +15,15 @@ Refactored core galaxy-counter code extracted from `tess-generative`, focused on
 - `configs/paths.example.yaml`: example external data paths
 
 ## Setup
+
+Install the package in editable mode (required before running any scripts — otherwise `galaxy_counter` will not be found as a module):
 ```bash
-pip install -r requirements.txt
+cd galaxy-counter   # or wherever you cloned the repo
+conda activate torchenv
+pip install -e .
 ```
+
+This is a one-time step per environment. After this, all scripts and SLURM jobs that use `torchenv` will be able to import `galaxy_counter`.
 
 ## Environment variables (optional)
 - `GALAXY_COUNTER_NEIGHBORS_H5`: neighbors HDF5 path
@@ -32,4 +38,3 @@ scripts/run_downstream_prepare.sh --checkpoint /path/to/model.ckpt --module doub
 scripts/run_downstream_predict.sh --suffix myrun
 scripts/run_neighbor_search.sh --checkpoint /path/to/model.ckpt --module double_train_fm_neighbors.py --suffix myrun
 ```
-

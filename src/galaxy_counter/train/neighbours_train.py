@@ -5,6 +5,11 @@ Uses NeighborsDataset from neighbors.py. No lenses, no masking, no multi-size.
 """
 
 import os
+import torch
+
+# Force regular hipBLAS instead of hipBLASLt — hipBLASLt is buggy on MI210
+# for certain matrix shapes and causes HIPBLAS_STATUS_INVALID_VALUE at runtime.
+torch.backends.cuda.preferred_blas_library("hipblas")
 
 # Print immediately so you see the script started (heavy imports below can take 1–2 min)
 print("neighbours_train: loading imports...", flush=True)
@@ -23,7 +28,6 @@ from galaxy_counter.neighbors import (
 )
 from galaxy_counter.models.double_train_fm_neighbors import (
     ConditionalFlowMatchingModule,
-    is_h100_gpu,
 )
 
 
@@ -45,18 +49,18 @@ def collate_for_model_precomputed(batch):
 # --- Config ---
 
 # If using neighbors file directly
-# NEIGHBORS_H5 = "/data/vision/billf/scratch/pablomer/data/neighbours_v2.h5"
+# NEIGHBORS_H5 = "/work1/jeroenaudenaert/pablomer/data/neighbours_v2.h5"
 # MAX_NEIGHBORS = 15
 
 
 
 #USING PRECOMPUTED BATCHES
-# PRECOMPUTED_H5 = "/data/vision/billf/scratch/pablomer/data/neighbor_batches/train_neighbors.vds"
-# PRECOMPUTED_H5 = "/data/vision/billf/scratch/pablomer/data/neighbor_batches/neighbors_shard_0000.h5"
-# VAL_PRECOMPUTED_H5 = "/data/vision/billf/scratch/pablomer/data/neighbor_batches/val_neighbors.vds"
+# PRECOMPUTED_H5 = "/work1/jeroenaudenaert/pablomer/data/neighbor_batches/train_neighbors.vds"
+# PRECOMPUTED_H5 = "/work1/jeroenaudenaert/pablomer/data/neighbor_batches/neighbors_shard_0000.h5"
+# VAL_PRECOMPUTED_H5 = "/work1/jeroenaudenaert/pablomer/data/neighbor_batches/val_neighbors.vds"
 PRECOMPUTED_H5 = os.getenv(
     "GALAXY_COUNTER_PRECOMPUTED_H5",
-    "/data/vision/billf/scratch/pablomer/data/neighbor_batches/neighbours_vds.h5",
+    "/work1/jeroenaudenaert/pablomer/data/train_neighbors.vds",
 )  # contains all
 BATCH_SIZE = 64  # 64 OOM on V100 32GB with 48x48 + 2 encoders + UNet; reduce if still OOM
 NUM_WORKERS = 0
@@ -78,14 +82,9 @@ def main():
     if seed is not None:
         pl.seed_everything(seed, workers=True)
 
-    is_h100 = is_h100_gpu()
     batch_size = BATCH_SIZE
-    precision_setting = "16-mixed"
+    precision_setting = "bf16-mixed"
     num_steps = NUM_STEPS
-    if is_h100:
-        batch_size = 64
-        precision_setting = "bf16-mixed"
-        print(f"H100 detected: batch_size={batch_size}, precision={precision_setting}")
 
     # Single dataset, then train/val split by index
     dataset = NeighborsPrecomputedDataset(PRECOMPUTED_H5)
@@ -140,12 +139,11 @@ def main():
     # Pass config here; Lightning handles DDP so only rank 0 gets real wandb (avoids .config.update() on placeholder)
     wandb_logger = WandbLogger(
         project=WANDB_PROJECT,
-        name="neighbours-48x48-zdim64-geom0.0-longtraining",
+        name="neighbours-48x48-zdim16-geom0.0-amd",
         log_model=False,
         config={
             "batch_size": batch_size,
             "precision": precision_setting,
-            "is_h100": is_h100,
             "dataset": "NeighborsDataset",
             "image_size": IMAGE_SIZE,
         },
