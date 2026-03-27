@@ -139,14 +139,20 @@ For a new dataset you will need to:
 
 ## Step 4 — (Optional) Pre-bake preprocessed batches for fast training
 
-In our case reading the h5 file back and forth according to the neighbor indexes was a huge bottleneck, which is why we "pre-computed" some batches for training  so that at training time we just had to read a file sequentially. This is not necessary if you don't end up using an ellaborate neighbor logic like we did.
-
+In our case reading the h5 file back and forth according to the neighbor indexes was a huge bottleneck, which is why we "pre-computed" some batches for training so that at training time we just had to read a file sequentially. This is not necessary if you don't end up using an elaborate neighbor logic like we did.
 
 Reading raw images and preprocessing on-the-fly is a bottleneck at scale.
 If you have a large dataset, pre-bake the preprocessed batches into shards:
 
-1. Run a script that iterates through your `NeighborsDataset` with multiple DataLoader
-   workers and writes each batch to a compressed HDF5 shard file. Each shard stores:
+1. Edit the configuration block at the top of `scripts/save_neighbor_shards.py`
+   (set `SOURCE_H5`, `OUTPUT_DIR`, `BATCH_SIZE`, `MAX_NEIGHBORS`) then run:
+
+   ```bash
+   python scripts/save_neighbor_shards.py
+   ```
+
+   This iterates through your `NeighborsDataset` with multiple DataLoader workers
+   and writes compressed HDF5 shard files.  Each shard stores:
 
    ```
    f['targets']         # (N, C, H, W)
@@ -155,16 +161,20 @@ If you have a large dataset, pre-bake the preprocessed batches into shards:
    f['neighbor_masks']  # (N, K)  bool
    ```
 
-2. Merge the shards into an HDF5 Virtual Dataset (a thin index file, no data copy):
+   If the run crashes, the current buffer is saved as a `_recovery.h5` file so
+   you do not lose progress.
 
-   ```python
-   import h5py, glob
+2. Merge the shards into HDF5 Virtual Datasets (thin index files, no data copy):
 
-   files = sorted(glob.glob("shards/shard_*.h5"))
-   # ... see save_neighbors_gemini_merge pattern for the VDS creation loop
+   ```bash
+   python scripts/merge_neighbor_shards.py
    ```
 
-3. Point `GALAXY_COUNTER_PRECOMPUTED_H5` at the VDS file and use
+   Edit `INPUT_DIR` and `OUTPUT_DIR` at the top of the script first.  This
+   produces `train_neighbors.vds` (all shards except the last) and
+   `val_neighbors.vds` (last shard).
+
+3. Point `GALAXY_COUNTER_PRECOMPUTED_H5` at the train VDS file and use
    `NeighborsPrecomputedDataset` in the training script.
 
 ---

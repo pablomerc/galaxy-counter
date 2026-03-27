@@ -11,7 +11,7 @@ Refactored core galaxy-counter code extracted from `tess-generative`, focused on
 - `experiments/aion_benchmark/`: migrated experiment scripts
 - `experiments/visualization/`: migrated visualization scripts
 - `data/metadata/`: overlap CSVs required by downstream preparation
-- `scripts/`: runnable entrypoint wrappers
+- `scripts/`: runnable entrypoint wrappers and data-preparation scripts
 - `configs/paths.example.yaml`: example external data paths
 
 ## Setup
@@ -32,6 +32,11 @@ This is a one-time step per environment. After this, all scripts and SLURM jobs 
 
 ## Common commands
 ```bash
+# Data preparation (run once before training)
+python scripts/save_neighbor_shards.py   # pre-bake NeighborsDataset into HDF5 shards
+python scripts/merge_neighbor_shards.py  # merge shards into train/val Virtual Datasets
+
+# Training and evaluation
 scripts/run_neighbors_train.sh
 scripts/run_baseline_train.sh
 scripts/run_downstream_prepare.sh --checkpoint /path/to/model.ckpt --module double_train_fm_neighbors.py --suffix myrun
