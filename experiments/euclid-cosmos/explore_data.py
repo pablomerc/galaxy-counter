@@ -23,10 +23,9 @@ EUCLID_PATTERN = "*.fits"
 
 # Each COSMOS galaxy has one file per band. List the band suffixes so the script
 # can reconstruct all three filenames from a single base name.
-# Example: if your files are galaxy_001_g.fits, galaxy_001_r.fits, galaxy_001_i.fits
-# set COSMOS_BAND_SUFFIXES = ["_g", "_r", "_i"] and COSMOS_PATTERN = "*_g.fits"
-COSMOS_BAND_SUFFIXES = ["F115W", "F150W", "F277W"]   # suffixes before .fits
-COSMOS_PATTERN = "F115W_*.fits"                  # anchor band to glob for unique galaxies
+# Example: F115W_001.fits, F150W_001.fits, F277W_001.fits for the same galaxy with ID "001".
+COSMOS_BAND_FILTERS = ["F115W", "F150W", "F277W"]   # suffixes before .fits
+COSMOS_PATTERN = "*.fits"                  # anchor band to glob for unique galaxies
 
 # How many files to sample per survey (set to None to use all)
 N_SAMPLE = 200
@@ -38,6 +37,10 @@ HDU_INDEX = 0
 
 
 def load_euclid(path: str) -> np.ndarray:
+    """Load a single Euclid cutout from a FITS file.
+    path: full path to the FITS file
+    Returns: (1, H, W) array of pixel values (1 channel, height, width)
+    """
     with fits.open(path) as hdul:
         data = hdul[1].data.astype(np.float32)
     if data.ndim == 2:
@@ -45,18 +48,18 @@ def load_euclid(path: str) -> np.ndarray:
     return data
 
 
-def load_cosmos(base_path: str, suffixes: list[str]) -> np.ndarray:
+def load_cosmos(base_path: str, filters: list[str]) -> np.ndarray:
     """Load one multi-band COSMOS galaxy from separate per-band FITS files.
 
-    Expects files named {band}_{galaxy_id}.fits (e.g. F115w_galaxy001.fits).
+    Expects files named {band}_{galaxy_id}.fits (e.g. F115W_001.fits).
     """
-    dirname = os.path.dirname(base_path)
-    basename = os.path.basename(base_path)  # e.g. "F115w_galaxy001.fits"
-    anchor = suffixes[0]                    # e.g. "F115w"
+    dirname = COSMOS_DIR  # e.g. "/n03data/fontirro/cosmos/120_cutouts"
+    basename = os.path.basename(base_path)  # e.g. "F115W_001.fits"
+    anchor = filters[0]                    # e.g. "F115W"
     # galaxy_id is the part after "{anchor}_", without the .fits extension
-    galaxy_id = basename[len(anchor) + 1 : -len(".fits")]  # e.g. "galaxy001"
+    galaxy_id = basename[len(anchor) + 1 : -len(".fits")]  # e.g. "001"
     bands = []
-    for suf in suffixes:
+    for suf in filters:
         p = os.path.join(dirname, f"{suf}_{galaxy_id}.fits")
         with fits.open(p) as hdul:
             ch = hdul[0].data.astype(np.float32)
@@ -106,6 +109,8 @@ def main():
     euclid_stack = np.stack(euclid_stack, axis=0)  # (N, 1, H, W)
     print(f"Euclid array shape: {euclid_stack.shape}")
 
+    
+
     # --- COSMOS ---
     cosmos_anchors = sorted(glob.glob(os.path.join(COSMOS_DIR, COSMOS_PATTERN)))
     print(f"\nFound {len(cosmos_anchors)} COSMOS galaxies (anchored on '{COSMOS_PATTERN}').")
@@ -114,7 +119,7 @@ def main():
     cosmos_stack = []
     for f in cosmos_anchors:
         try:
-            cosmos_stack.append(load_cosmos(f, COSMOS_BAND_SUFFIXES))
+            cosmos_stack.append(load_cosmos(f, COSMOS_BAND_FILTERS))
         except Exception as e:
             print(f"  [WARN] skipping {f}: {e}")
     cosmos_stack = np.stack(cosmos_stack, axis=0)  # (N, 3, H, W)
@@ -134,7 +139,7 @@ def main():
     print("=" * 55)
     cosmos_stats = channel_stats(cosmos_stack)
     for ci, s in cosmos_stats.items():
-        suf = COSMOS_BAND_SUFFIXES[ci] if ci < len(COSMOS_BAND_SUFFIXES) else f"ch{ci}"
+        suf = COSMOS_BAND_FILTERS[ci] if ci < len(COSMOS_BAND_FILTERS) else f"ch{ci}"
         print(f"  {suf}:  min={s['min']:.4g}  max={s['max']:.4g}"
               f"  p0.1={s['p0.1']:.4g}  p99={s['p99']:.4g}  p99.9={s['p99.9']:.4g}")
 
@@ -145,7 +150,7 @@ def main():
     for ci, s in euclid_stats.items():
         print(f'  "EUCLID": {s["p99.9"]:.4g},')
     for ci, s in cosmos_stats.items():
-        suf = COSMOS_BAND_SUFFIXES[ci] if ci < len(COSMOS_BAND_SUFFIXES) else f"COSMOS-ch{ci}"
+        suf = COSMOS_BAND_FILTERS[ci] if ci < len(COSMOS_BAND_FILTERS) else f"COSMOS-ch{ci}"
         key = f"COSMOS{suf.upper()}"
         print(f'  "{key}": {s["p99.9"]:.4g},')
 
