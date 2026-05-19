@@ -25,8 +25,8 @@ EUCLID_PATTERN = "*.fits"
 # can reconstruct all three filenames from a single base name.
 # Example: if your files are galaxy_001_g.fits, galaxy_001_r.fits, galaxy_001_i.fits
 # set COSMOS_BAND_SUFFIXES = ["_g", "_r", "_i"] and COSMOS_PATTERN = "*_g.fits"
-COSMOS_BAND_SUFFIXES = ["F115w", "F150w", "F277w"]   # suffixes before .fits
-COSMOS_PATTERN = "F115w_*.fits"                  # anchor band to glob for unique galaxies
+COSMOS_BAND_SUFFIXES = ["F115W", "F150W", "F277W"]   # suffixes before .fits
+COSMOS_PATTERN = "F115W_*.fits"                  # anchor band to glob for unique galaxies
 
 # How many files to sample per survey (set to None to use all)
 N_SAMPLE = 200
