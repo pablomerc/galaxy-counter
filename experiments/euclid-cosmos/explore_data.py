@@ -46,11 +46,18 @@ def load_euclid(path: str) -> np.ndarray:
 
 
 def load_cosmos(base_path: str, suffixes: list[str]) -> np.ndarray:
-    """Load one multi-band COSMOS galaxy from separate per-band FITS files."""
-    stem = base_path[: base_path.rfind(suffixes[0])]  # strip anchor suffix
+    """Load one multi-band COSMOS galaxy from separate per-band FITS files.
+
+    Expects files named {band}_{galaxy_id}.fits (e.g. F115w_galaxy001.fits).
+    """
+    dirname = os.path.dirname(base_path)
+    basename = os.path.basename(base_path)  # e.g. "F115w_galaxy001.fits"
+    anchor = suffixes[0]                    # e.g. "F115w"
+    # galaxy_id is the part after "{anchor}_", without the .fits extension
+    galaxy_id = basename[len(anchor) + 1 : -len(".fits")]  # e.g. "galaxy001"
     bands = []
     for suf in suffixes:
-        p = stem + suf + ".fits"
+        p = os.path.join(dirname, f"{suf}_{galaxy_id}.fits")
         with fits.open(p) as hdul:
             ch = hdul[0].data.astype(np.float32)
         if ch.ndim == 3:
