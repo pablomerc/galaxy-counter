@@ -15,8 +15,8 @@ from astropy.io import fits
 # CONFIG — edit these paths and patterns to match your data layout
 # ---------------------------------------------------------------------------
 
-EUCLID_DIR = "/n03data/fontirro/euclid/40_cutouts"  # directory containing Euclid FITS files
-COSMOS_DIR = "/n03data/fontirro/cosmos/120_cutouts"  # directory containing COSMOS FITS files
+EUCLID_DIR = "/automnt/n03data/fontirro/euclid/40_cutouts"  # directory containing Euclid FITS files
+COSMOS_DIR = "/automnt/n03data/fontirro/cosmos/120_cutouts"  # directory containing COSMOS FITS files
 
 # Glob pattern to find Euclid files inside their respective directories
 EUCLID_PATTERN = "*.fits"
