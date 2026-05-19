@@ -109,7 +109,7 @@ def main():
     euclid_stack = np.stack(euclid_stack, axis=0)  # (N, 1, H, W)
     print(f"Euclid array shape: {euclid_stack.shape}")
 
-    
+    return  # temporary break — remove to run COSMOS section
 
     # --- COSMOS ---
     cosmos_anchors = sorted(glob.glob(os.path.join(COSMOS_DIR, COSMOS_PATTERN)))
