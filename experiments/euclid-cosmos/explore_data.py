@@ -30,9 +30,6 @@ COSMOS_PATTERN = "*.fits"
 # How many files to sample per survey (set to None to use all)
 N_SAMPLE = 200
 
-# Which HDU index to read from (0 = primary; adjust if your data uses extensions)
-HDU_INDEX = 0
-
 # ---------------------------------------------------------------------------
 
 
