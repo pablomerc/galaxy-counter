@@ -15,8 +15,8 @@ from astropy.io import fits
 # CONFIG — edit these paths and patterns to match your data layout
 # ---------------------------------------------------------------------------
 
-EUCLID_DIR = "/automnt/n03data/fontirro/euclid/40_cutouts"  # directory containing Euclid FITS files
-COSMOS_DIR = "/automnt/n03data/fontirro/cosmos/120_cutouts"  # directory containing COSMOS FITS files
+EUCLID_DIR_VIS = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis"  # directory containing Euclid FITS files
+COSMOS_DIR = "/n03data/fontirro/cosmos/120_cutouts/"  # directory containing COSMOS FITS files
 
 # Glob pattern to find Euclid files inside their respective directories
 EUCLID_PATTERN = "*.fits"
@@ -96,7 +96,7 @@ def sample_files(files: list[str], n: int | None) -> list[str]:
 
 def main():
     # --- Euclid ---
-    euclid_files = sorted(glob.glob(os.path.join(EUCLID_DIR, EUCLID_PATTERN)))
+    euclid_files = sorted(glob.glob(os.path.join(EUCLID_DIR_VIS, EUCLID_PATTERN)))
     print(f"Found {len(euclid_files)} Euclid files.")
     euclid_files = sample_files(euclid_files, N_SAMPLE)
 
