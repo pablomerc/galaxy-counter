@@ -1,6 +1,9 @@
 """
 Explore Euclid and COSMOS cutout statistics to calibrate BAND_CENTER_MAX.
 
+In a first step, this script only works with the VIS band (Euclid) and F115W band (COSMOS).
+TODO: add other bands (e.g., Y, J, H for Euclid and F150W, F277W for COSMOS).
+
 Edit the CONFIG block below to match your directory layout and band suffixes,
 then run:
     python experiments/euclid-cosmos/explore_data.py
