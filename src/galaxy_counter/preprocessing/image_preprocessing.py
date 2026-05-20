@@ -10,27 +10,13 @@ import torch
 
 # Keeps track of the band indices for HSC and DES bands
 BAND_TO_INDEX = {
-    "HSC-G": 0,
-    "HSC-R": 1,
-    "HSC-I": 2,
-    "HSC-Z": 3,
-    "HSC-Y": 4,
-    "DES-G": 5,
-    "DES-R": 6,
-    "DES-I": 7,
-    "DES-Z": 8,
+    "VIS": 0,
+    "F115W": 1
 }
 # Maximum band center values for HSC and DES bands
 BAND_CENTER_MAX = {
-    "HSC-G": 80,
-    "HSC-R": 110,
-    "HSC-I": 200,
-    "HSC-Z": 330,
-    "HSC-Y": 500,
-    "DES-G": 6,
-    "DES-R": 15,
-    "DES-I": 20,
-    "DES-Z": 25,
+    "VIS": 80,
+    "F115W": 110
 }
 
 class CenterCrop:
@@ -64,7 +50,7 @@ class Clamp:
         return image
 
 
-class RescaleToLegacySurvey:
+class RescaleToCOSMOS:
     """Formatter that rescales the images based on survey zeropoint."""
 
     def __init__(self):
@@ -198,7 +184,7 @@ def preprocess_image(
 
     # Step 3: Rescale
     survey = get_survey(bands)
-    rescaler = RescaleToLegacySurvey()
+    rescaler = RescaleToCOSMOS()
     processed = rescaler.forward(processed.clone(), survey)
 
     # Step 4: Range compression (optional)
@@ -260,7 +246,7 @@ def preprocess_image_v2(image: torch.Tensor, crop_size: int = 96, survey: str = 
     processed = clamper(processed.clone(), bands)
 
     # Rescale (Uses survey string to decide logic)
-    rescaler = RescaleToLegacySurvey()
+    rescaler = RescaleToCOSMOS()
     processed = rescaler.forward(processed.clone(), survey)
 
     # Range Compress (Defaults)
@@ -321,7 +307,7 @@ def main():
 
     # Step 3: Rescale to Legacy Survey
     survey = get_survey(bands_in)
-    rescaler = RescaleToLegacySurvey()
+    rescaler = RescaleToCOSMOS()
     im_rescaled = rescaler.forward(im_clamped.clone(), survey)
     print(f"\n4. After rescale.forward (survey={survey}): {im_rescaled.shape}")
     print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
