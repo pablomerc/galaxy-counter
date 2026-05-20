@@ -1,5 +1,5 @@
 '''
-Script for preprocessing galaxy images.
+Script for preprocessing galaxy images (COSMOS and EUCLID).
 
 Following the AION-1 Paper from Parker at al 2025.
 
@@ -34,7 +34,9 @@ BAND_CENTER_MAX = {
 }
 
 class CenterCrop:
-    """Formatter that crops the images to have a fixed number of bands."""
+    """Formatter that crops the images to have a fixed number of bands.
+    i.e. It crops a square region of size crop_size × crop_size from the center of each image.
+    """
 
     def __init__(self, crop_size: int = 96):
         self.crop_size = crop_size
@@ -278,13 +280,13 @@ def main():
     import glob
     import os
     import numpy as np
-    from datasets import load_dataset
+    #from datasets import load_dataset
 
     # Load dataset
-    dataset_path = '/mnt/scratch/legacysurvey_hsc_crossmatched/data'
-    pattern = os.path.join(dataset_path, "*.parquet")
-    all_files = sorted(glob.glob(pattern))
-    dataset = load_dataset("parquet", data_files=all_files, split="train")
+    # dataset_path = '/n03data/fontirro/'
+    # pattern = os.path.join(dataset_path, "*.parquet")
+    # all_files = sorted(glob.glob(pattern))
+    # dataset = load_dataset("parquet", data_files=all_files, split="train")
 
     idx = 10
     example_record = dataset[idx]

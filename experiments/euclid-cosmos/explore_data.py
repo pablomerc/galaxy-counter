@@ -35,8 +35,10 @@ N_SAMPLE = 200
 
 def load_euclid(path: str) -> np.ndarray:
     """Load a single Euclid cutout from a FITS file.
-    path: full path to the FITS file
-    Returns: (1, H, W) array of pixel values (1 channel, height, width)
+    Args:
+        path: full path to the FITS file
+    Returns:
+        (1, H, W) array of pixel values (1 channel, height, width)
     """
     with fits.open(path) as hdul:
         data = hdul[1].data.astype(np.float32)
@@ -47,8 +49,10 @@ def load_euclid(path: str) -> np.ndarray:
 
 def load_cosmos(path: str) -> np.ndarray:
     """Load F115W band COSMOS galaxy from a FITS files.
-    path: full path to the F115W band FITS file
-    Returns: (1, H, W) array of pixel values (1 channel, height, width)
+    Args:
+        path: full path to the F115W band FITS file
+    Returns:
+        (1, H, W) array of pixel values (1 channel, height, width)
     """
     with fits.open(path) as hdul:
         data = hdul[0].data.astype(np.float32)
