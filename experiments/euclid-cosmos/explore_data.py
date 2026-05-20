@@ -16,16 +16,13 @@ from astropy.io import fits
 # ---------------------------------------------------------------------------
 
 EUCLID_DIR_VIS = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis"  # directory containing Euclid FITS files
-COSMOS_DIR = "/n03data/fontirro/cosmos/120_cutouts/"  # directory containing COSMOS FITS files
+COSMOS_DIR_F115W = "/n03data/fontirro/cosmos/120_cutouts/f115w"  # directory containing COSMOS FITS files
 
-# Glob pattern to find Euclid files inside their respective directories
+# glob pattern to find Euclid files inside their respective directories
 EUCLID_PATTERN = "*.fits"
 
-# Each COSMOS galaxy has one file per band. List the band suffixes so the script
-# can reconstruct all three filenames from a single base name.
-# Example: F115W_001.fits, F150W_001.fits, F277W_001.fits for the same galaxy with ID "001".
-COSMOS_BAND_FILTERS = ["F115W", "F150W", "F277W"]   # suffixes before .fits
-COSMOS_PATTERN = "*.fits"                  # anchor band to glob for unique galaxies
+ # glob pattern to find COSMOS files.
+COSMOS_PATTERN = "*.fits"            
 
 # How many files to sample per survey (set to None to use all)
 N_SAMPLE = 200
@@ -48,25 +45,17 @@ def load_euclid(path: str) -> np.ndarray:
     return data
 
 
-def load_cosmos(base_path: str, filters: list[str]) -> np.ndarray:
-    """Load one multi-band COSMOS galaxy from separate per-band FITS files.
-
-    Expects files named {band}_{galaxy_id}.fits (e.g. F115W_001.fits).
+def load_cosmos(path: str) -> np.ndarray:
+    """Load F115W band COSMOS galaxy from a FITS files.
+    path: full path to the F115W band FITS file
+    Returns: (1, H, W) array of pixel values (1 channel, height, width)
     """
-    dirname = COSMOS_DIR  # e.g. "/n03data/fontirro/cosmos/120_cutouts"
-    basename = os.path.basename(base_path)  # e.g. "F115W_001.fits"
-    anchor = filters[0]                    # e.g. "F115W"
-    # galaxy_id is the part after "{anchor}_", without the .fits extension
-    galaxy_id = basename[len(anchor) + 1 : -len(".fits")]  # e.g. "001"
-    bands = []
-    for suf in filters:
-        p = os.path.join(dirname, f"{suf}_{galaxy_id}.fits")
-        with fits.open(p) as hdul:
-            ch = hdul[0].data.astype(np.float32)
-        if ch.ndim == 3:
-            ch = ch[0]  # drop degenerate leading axis if present
-        bands.append(ch)
-    return np.stack(bands, axis=0)  # (3, H, W)
+    with fits.open(path) as hdul:
+        data = hdul[0].data.astype(np.float32)
+    if data.ndim == 3:
+        data = data[0]  # drop degenerate leading axis if present
+    return data
+
 
 
 def channel_stats(stack: np.ndarray) -> dict:
@@ -112,14 +101,14 @@ def main():
     return  # temporary break — remove to run COSMOS section
 
     # --- COSMOS ---
-    cosmos_anchors = sorted(glob.glob(os.path.join(COSMOS_DIR, COSMOS_PATTERN)))
+    cosmos_anchors = sorted(glob.glob(os.path.join(COSMOS_DIR_F115W, COSMOS_PATTERN)))
     print(f"\nFound {len(cosmos_anchors)} COSMOS galaxies (anchored on '{COSMOS_PATTERN}').")
     cosmos_anchors = sample_files(cosmos_anchors, N_SAMPLE)
 
     cosmos_stack = []
     for f in cosmos_anchors:
         try:
-            cosmos_stack.append(load_cosmos(f, COSMOS_BAND_FILTERS))
+            cosmos_stack.append(load_cosmos(f))
         except Exception as e:
             print(f"  [WARN] skipping {f}: {e}")
     cosmos_stack = np.stack(cosmos_stack, axis=0)  # (N, 3, H, W)
