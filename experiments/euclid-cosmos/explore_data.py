@@ -85,7 +85,8 @@ def channel_stats(stack: np.ndarray) -> dict:
 
 
 def sample_files(files: list[str], n: int | None) -> list[str]:
-    """Randomly sample n files from the list (or return all if n is None or too large)."""
+    """Randomly sample n files from the list (or return all if n is None or too large).
+    """
     if n is None or n >= len(files):
         return files
     rng = np.random.default_rng(42)
@@ -95,7 +96,7 @@ def sample_files(files: list[str], n: int | None) -> list[str]:
 
 def main():
     # --- Euclid ---
-    #obtaining files
+    #reading each file from directory and sorting them.
     euclid_files = sorted(glob.glob(os.path.join(EUCLID_DIR_VIS, EUCLID_PATTERN)))
     print(f"Found {len(euclid_files)} Euclid files.")
 
@@ -106,7 +107,7 @@ def main():
     euclid_stack = []
     for f in euclid_files:
         try:
-            euclid_stack.append(load_euclid(f))
+            euclid_stack.append(load_euclid(f)) #remember that load_euclid adds one channel dimension, so each entry is (1, H, W)
         except Exception as e:
             print(f"  [WARN] skipping {f}: {e}")
     euclid_stack = np.stack(euclid_stack, axis=0)  # (N, 1, H, W)
@@ -122,7 +123,7 @@ def main():
     cosmos_stack = []
     for f in cosmos_files:
         try:
-            cosmos_stack.append(load_cosmos(f))
+            cosmos_stack.append(load_cosmos(f)) #remember that load_cosmos adds one channel dimension, so each entry is (1, H, W).
         except Exception as e:
             print(f"  [WARN] skipping {f}: {e}")
     cosmos_stack = np.stack(cosmos_stack, axis=0)  # (N, 1, H, W)
