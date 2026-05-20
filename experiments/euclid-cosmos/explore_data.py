@@ -59,7 +59,16 @@ def load_cosmos(path: str) -> np.ndarray:
 
 
 def channel_stats(stack: np.ndarray) -> dict:
-    """Return per-channel statistics for an (N, C, H, W) array."""
+    """Return per-channel statistics for an (N, C, H, W) array, where:
+    N = number of samples, C = number of channels, H = height, W = width.
+    stats: 
+    min: min pixel value, 
+    max: max pixel value, 
+    p99: 99th percentile pixel value (i.e. the bright tail, typical bright pixel values), 
+    p99.9: 99.9th percentile pixel value (i.e the near-maximum excluding outliers like cosmic rays 
+                    — this is what gets used to set BAND_CENTER_MAX), 
+    p0.1: 0.1th percentile pixel value i.e. the faint/negative tail (useful for spotting bad pixels).
+    """
     n, c = stack.shape[:2]
     stats = {}
     for ci in range(c):
@@ -76,6 +85,7 @@ def channel_stats(stack: np.ndarray) -> dict:
 
 
 def sample_files(files: list[str], n: int | None) -> list[str]:
+    """Randomly sample n files from the list (or return all if n is None or too large)."""
     if n is None or n >= len(files):
         return files
     rng = np.random.default_rng(42)
@@ -88,9 +98,11 @@ def main():
     #obtaining files
     euclid_files = sorted(glob.glob(os.path.join(EUCLID_DIR_VIS, EUCLID_PATTERN)))
     print(f"Found {len(euclid_files)} Euclid files.")
+
+    #randomly sample files if N_SAMPLE is set.
     euclid_files = sample_files(euclid_files, N_SAMPLE)
 
-    #adding files to stack
+    #adding N_SAMPLE files' pixel values to stack.
     euclid_stack = []
     for f in euclid_files:
         try:
