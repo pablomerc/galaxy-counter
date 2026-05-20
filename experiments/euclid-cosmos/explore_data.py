@@ -85,10 +85,12 @@ def sample_files(files: list[str], n: int | None) -> list[str]:
 
 def main():
     # --- Euclid ---
+    #obtaining files
     euclid_files = sorted(glob.glob(os.path.join(EUCLID_DIR_VIS, EUCLID_PATTERN)))
     print(f"Found {len(euclid_files)} Euclid files.")
     euclid_files = sample_files(euclid_files, N_SAMPLE)
 
+    #adding files to stack
     euclid_stack = []
     for f in euclid_files:
         try:
@@ -96,6 +98,7 @@ def main():
         except Exception as e:
             print(f"  [WARN] skipping {f}: {e}")
     euclid_stack = np.stack(euclid_stack, axis=0)  # (N, 1, H, W)
+    print(euclid_stack)
     print(f"Euclid array shape: {euclid_stack.shape}")
 
     
