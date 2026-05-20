@@ -52,8 +52,8 @@ def load_cosmos(path: str) -> np.ndarray:
     """
     with fits.open(path) as hdul:
         data = hdul[0].data.astype(np.float32)
-    if data.ndim == 3:
-        data = data[0]  # drop degenerate leading axis if present
+    if data.ndim == 2:
+        data = data[np.newaxis]  # (H, W) -> (1, H, W) where H is height and W is width.
     return data
 
 
@@ -98,38 +98,36 @@ def main():
     euclid_stack = np.stack(euclid_stack, axis=0)  # (N, 1, H, W)
     print(f"Euclid array shape: {euclid_stack.shape}")
 
-    return  # temporary break — remove to run COSMOS section
-
+    
     # --- COSMOS ---
-    cosmos_anchors = sorted(glob.glob(os.path.join(COSMOS_DIR_F115W, COSMOS_PATTERN)))
-    print(f"\nFound {len(cosmos_anchors)} COSMOS galaxies (anchored on '{COSMOS_PATTERN}').")
-    cosmos_anchors = sample_files(cosmos_anchors, N_SAMPLE)
+    cosmos_files = sorted(glob.glob(os.path.join(COSMOS_DIR_F115W, COSMOS_PATTERN)))
+    print(f"\nFound {len(cosmos_files)} COSMOS files")
+    cosmos_files = sample_files(cosmos_files, N_SAMPLE)
 
     cosmos_stack = []
-    for f in cosmos_anchors:
+    for f in cosmos_files:
         try:
             cosmos_stack.append(load_cosmos(f))
         except Exception as e:
             print(f"  [WARN] skipping {f}: {e}")
-    cosmos_stack = np.stack(cosmos_stack, axis=0)  # (N, 3, H, W)
+    cosmos_stack = np.stack(cosmos_stack, axis=0)  # (N, 1, H, W)
     print(f"COSMOS array shape: {cosmos_stack.shape}")
 
     # --- Report ---
     print("\n" + "=" * 55)
-    print("EUCLID  (1 channel)")
+    print("EUCLID  (1 channel - VIS band)")
     print("=" * 55)
     euclid_stats = channel_stats(euclid_stack)
     for ci, s in euclid_stats.items():
         print(f"  ch{ci}:  min={s['min']:.4g}  max={s['max']:.4g}"
-              f"  p0.1={s['p0.1']:.4g}  p99={s['p99']:.4g}  p99.9={s['p99.9']:.4g}")
+                f"  p0.1={s['p0.1']:.4g}  p99={s['p99']:.4g}  p99.9={s['p99.9']:.4g}")
 
     print("\n" + "=" * 55)
-    print("COSMOS  (3 channels — indices match COSMOS_BAND_SUFFIXES order)")
+    print("COSMOS  (1 channels - F115W band)")
     print("=" * 55)
     cosmos_stats = channel_stats(cosmos_stack)
     for ci, s in cosmos_stats.items():
-        suf = COSMOS_BAND_FILTERS[ci] if ci < len(COSMOS_BAND_FILTERS) else f"ch{ci}"
-        print(f"  {suf}:  min={s['min']:.4g}  max={s['max']:.4g}"
+        print(f"  ch{ci}:  min={s['min']:.4g}  max={s['max']:.4g}"
               f"  p0.1={s['p0.1']:.4g}  p99={s['p99']:.4g}  p99.9={s['p99.9']:.4g}")
 
     print("\n" + "=" * 55)
@@ -139,9 +137,7 @@ def main():
     for ci, s in euclid_stats.items():
         print(f'  "EUCLID": {s["p99.9"]:.4g},')
     for ci, s in cosmos_stats.items():
-        suf = COSMOS_BAND_FILTERS[ci] if ci < len(COSMOS_BAND_FILTERS) else f"COSMOS-ch{ci}"
-        key = f"COSMOS{suf.upper()}"
-        print(f'  "{key}": {s["p99.9"]:.4g},')
+        print(f'  "COSMOS": {s["p99.9"]:.4g},')
 
 
 if __name__ == "__main__":
