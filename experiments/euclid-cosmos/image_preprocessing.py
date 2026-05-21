@@ -250,9 +250,11 @@ def preprocess_image_v2(
     # clamper = Clamp()
     # processed = clamper(processed.clone(), bands)
 
-    # Rescale (Uses survey string to decide logic)
+    # Rescale each band to COSMOS ZP
+    processed = image.clone()
     rescaler = RescaleToCOSMOS()
-    processed = rescaler.forward(processed.clone(), survey)
+    for i, band in enumerate(bands):
+        processed[:, i, :, :] = rescaler.forward(processed[:, i:i+1, :, :], band)[:, 0, :, :]
 
     # Range Compress (Defaults)
     range_compressor = RangeCompress()
