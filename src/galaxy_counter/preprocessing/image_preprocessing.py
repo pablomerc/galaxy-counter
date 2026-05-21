@@ -50,33 +50,34 @@ class Clamp:
         return image
     
 
+COSMOS_ZP = 23.9
+
+# Euclid AB zeropoints per filter — verify these for your data release
+EUCLID_ZP = {
+    "VIS": 25.6578,   # TODO: verify for your DR
+    "Y":   25.0,      # TODO: verify for your DR
+    "J":   25.0,      # TODO: verify for your DR
+    "H":   25.0,      # TODO: verify for your DR
+}
+
+
 class RescaleToCOSMOS:
-    """Formatter that rescales the images based on survey zeropoint."""
+    """Rescales Euclid flux to the COSMOS zeropoint (23.9 AB).
 
-    def __init__(self):
-        pass
+    COSMOS images are already at ZP=23.9, so they pass through unchanged.
+    Euclid images are multiplied by 10^((COSMOS_ZP - EUCLID_ZP[band]) / 2.5).
+    """
 
-    def convert_zeropoint(self, zp: float) -> float:
-        """Convert zeropoint to scale factor."""
-        return 10.0 ** ((zp - 22.5) / 2.5)
+    def _scale(self, band: str) -> float:
+        if band not in EUCLID_ZP:
+            return 1.0  # COSMOS band — no rescaling needed
+        return 10.0 ** ((COSMOS_ZP - EUCLID_ZP[band]) / 2.5)
 
-    def reverse_zeropoint(self, scale: float) -> float:
-        """Convert scale factor back to zeropoint."""
-        return 22.5 - 2.5 * torch.log10(scale)
+    def forward(self, image: torch.Tensor, band: str) -> torch.Tensor:
+        return image.clone() * self._scale(band)
 
-    def forward(self, image, survey):
-        """Rescale image by dividing by zeropoint scale factor."""
-        zpscale = self.convert_zeropoint(27.0) if (survey and survey.upper() == "EUC") else 1.0
-        image = image.clone()  # Avoid in-place modification
-        image /= zpscale
-        return image
-
-    def backward(self, image, survey):
-        """Reverse rescale by multiplying by zeropoint scale factor."""
-        zpscale = self.convert_zeropoint(27.0) if (survey and survey.upper() == "EUC") else 1.0
-        image = image.clone()  # Avoid in-place modification
-        image *= zpscale
-        return image
+    def backward(self, image: torch.Tensor, band: str) -> torch.Tensor:
+        return image.clone() / self._scale(band)
 
 
 class RangeCompress:
@@ -273,60 +274,58 @@ def main():
     EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/your_euclid_file.fits"
     COSMOS_FILE = "/n03data/fontirro/cosmos/120_cutouts/F115W_your_galaxy_id.fits"
 
-    for label, filepath, hdu_index, band, survey in [
-        ("EUC-VIS",   EUCLID_FILE, 1, "VIS",   "EUCLID"),
-        ("COS-F115W", COSMOS_FILE, 0, "F115W",  "COSMOS"),
-    ]:
-        print("\n" + "=" * 60)
-        print(f"PREPROCESSING PIPELINE — {label}")
-        print("=" * 60)
+    label,filepath,hdu_index, band =  "EUC-VIS", EUCLID_FILE, 1, "VIS"
 
-        # Load image data.
-        with fits.open(filepath) as hdul:
-            data = hdul[hdu_index].data.astype(np.float32)
-        if data.ndim == 2:
-            data = data[np.newaxis]
-        im_full = torch.from_numpy(data).unsqueeze(0)  # (1, 1, H, W)
-        print(f"\n1. Original image shape: {im_full.shape}")
-        print(f"   Range: [{im_full.min():.4f}, {im_full.max():.4f}]")
+    print("\n" + "=" * 60)
+    print(f"PREPROCESSING PIPELINE — {label}")
+    print("=" * 60)
 
-        # Step 3: Rescale (no-op since ZPs are already matched, kept for completeness)
-        rescaler = RescaleToCOSMOS()
-        im_rescaled = rescaler.forward(im_full.clone(), survey)
-        print(f"\n2. After rescale.forward (survey={survey}): {im_rescaled.shape}")
-        print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+    # Load image data.
+    with fits.open(filepath) as hdul:
+        data = hdul[hdu_index].data.astype(np.float32)
+    if data.ndim == 2:
+        data = data[np.newaxis]
+    im_full = torch.from_numpy(data).unsqueeze(0)  # (1, 1, H, W)
+    print(f"\n1. Original image shape: {im_full.shape}")
+    print(f"   Range: [{im_full.min():.4f}, {im_full.max():.4f}]")
 
-        # Step 4: Range compression
-        range_compression_factor = 0.01
-        mult_factor = 10.0
-        range_compressor = RangeCompress(
-            range_compression_factor=range_compression_factor,
-            mult_factor=mult_factor,
-        )
-        im_range_compressed = range_compressor.forward(im_rescaled.clone())
-        print(f"\n3. After range_compress: {im_range_compressed.shape}")
-        print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
-        print(f"   range_compression_factor: {range_compression_factor}")
-        print(f"   mult_factor: {mult_factor}")
-        print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
+    # Step 3: Rescale Euclid to COSMOS ZP (23.9); COSMOS passes through unchanged
+    rescaler = RescaleToCOSMOS()
+    im_rescaled = rescaler.forward(im_full.clone(), band)
+    print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
+    print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
 
-        # Summary
-        print("\n" + "=" * 60)
-        print("SUMMARY OF TRANSFORMATIONS")
-        print("=" * 60)
-        print(f"Original range:    [{im_full.min():.4f}, {im_full.max():.4f}]")
-        print(f"Rescaled range:    [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
-        print(f"Range compressed:  [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
-        print("=" * 60)
+    # Step 4: Range compression
+    range_compression_factor = 0.01
+    mult_factor = 10.0
+    range_compressor = RangeCompress(
+        range_compression_factor=range_compression_factor,
+        mult_factor=mult_factor,
+    )
+    im_range_compressed = range_compressor.forward(im_rescaled.clone())
+    print(f"\n3. After range_compress: {im_range_compressed.shape}")
+    print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+    print(f"   range_compression_factor: {range_compression_factor}")
+    print(f"   mult_factor: {mult_factor}")
+    print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
 
-        # Comparison: preprocess_image_v2 with explicit bands
-        print("\n" + "=" * 60)
-        print("USING preprocess_image_v2 FUNCTION: preprocess_image_v2()")
-        print("=" * 60)
-        im_preprocessed = preprocess_image_v2(im_full, bands=[band])
-        print(f"Preprocessed image shape: {im_preprocessed.shape}")
-        print(f"Preprocessed image range: [{im_preprocessed.min():.4f}, {im_preprocessed.max():.4f}]")
-        print("=" * 60)
+    # Summary
+    print("\n" + "=" * 60)
+    print("SUMMARY OF TRANSFORMATIONS")
+    print("=" * 60)
+    print(f"Original range:    [{im_full.min():.4f}, {im_full.max():.4f}]")
+    print(f"Rescaled range:    [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+    print(f"Range compressed:  [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+    print("=" * 60)
+
+    # Comparison: preprocess_image_v2 with explicit bands
+    print("\n" + "=" * 60)
+    print("USING preprocess_image_v2 FUNCTION: preprocess_image_v2()")
+    print("=" * 60)
+    im_preprocessed = preprocess_image_v2(im_full, bands=[band])
+    print(f"Preprocessed image shape: {im_preprocessed.shape}")
+    print(f"Preprocessed image range: [{im_preprocessed.min():.4f}, {im_preprocessed.max():.4f}]")
+    print("=" * 60)
 
 
 
