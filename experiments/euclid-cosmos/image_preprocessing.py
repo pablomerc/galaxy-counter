@@ -271,7 +271,7 @@ def main():
     import numpy as np
     from astropy.io import fits
 
-    EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_032_147271e7TILE_101542815_14969272158331464_149.692722_1.968534_1502704970019216576_cutout.fits"
+    EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_013_68b1674fTILE_101544256_14974135090968736_149.741351_2.147102_cutout.fits"
     #COSMOS_FILE = "/n03data/fontirro/cosmos/120_cutouts/F115W_your_galaxy_id.fits"
 
 
