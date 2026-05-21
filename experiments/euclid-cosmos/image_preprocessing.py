@@ -54,10 +54,10 @@ COSMOS_ZP = 23.9
 
 # Euclid AB zeropoints per filter — verify these for your data release
 EUCLID_ZP = {
-    "VIS": 25.6578,   # TODO: verify for your DR
-    "Y":   25.0,      # TODO: verify for your DR
-    "J":   25.0,      # TODO: verify for your DR
-    "H":   25.0,      # TODO: verify for your DR
+    "VIS": 26.2,   # TODO: verify for your DR
+    "Y":   24.3,      # TODO: verify for your DR
+    "J":   24.5,      # TODO: verify for your DR
+    "H":   24.4,      # TODO: verify for your DR
 }
 
 
