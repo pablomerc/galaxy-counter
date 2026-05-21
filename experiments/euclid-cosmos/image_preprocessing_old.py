@@ -1,5 +1,5 @@
 '''
-Script for preprocessing galaxy images (COSMOS and EUCLID).
+Script for preprocessing galaxy images.
 
 Following the AION-1 Paper from Parker at al 2025.
 
@@ -10,19 +10,31 @@ import torch
 
 # Keeps track of the band indices for HSC and DES bands
 BAND_TO_INDEX = {
-    "VIS": 0,
-    "F115W": 1
+    "HSC-G": 0,
+    "HSC-R": 1,
+    "HSC-I": 2,
+    "HSC-Z": 3,
+    "HSC-Y": 4,
+    "DES-G": 5,
+    "DES-R": 6,
+    "DES-I": 7,
+    "DES-Z": 8,
 }
 # Maximum band center values for HSC and DES bands
 BAND_CENTER_MAX = {
-    "VIS": 80,
-    "F115W": 110
+    "HSC-G": 80,
+    "HSC-R": 110,
+    "HSC-I": 200,
+    "HSC-Z": 330,
+    "HSC-Y": 500,
+    "DES-G": 6,
+    "DES-R": 15,
+    "DES-I": 20,
+    "DES-Z": 25,
 }
 
 class CenterCrop:
-    """Formatter that crops the images to have a fixed number of bands.
-    i.e. It crops a square region of size crop_size × crop_size from the center of each image.
-    """
+    """Formatter that crops the images to have a fixed number of bands."""
 
     def __init__(self, crop_size: int = 96):
         self.crop_size = crop_size
@@ -48,36 +60,35 @@ class Clamp:
                 image[:, i, :, :], -self.clamp_dict[band], self.clamp_dict[band]
             )
         return image
-    
-
-COSMOS_ZP = 23.9
-
-# Euclid AB zeropoints per filter — verify these for your data release
-EUCLID_ZP = {
-    "VIS": 25.6578,   # TODO: verify for your DR
-    "Y":   25.0,      # TODO: verify for your DR
-    "J":   25.0,      # TODO: verify for your DR
-    "H":   25.0,      # TODO: verify for your DR
-}
 
 
-class RescaleToCOSMOS:
-    """Rescales Euclid flux to the COSMOS zeropoint (23.9 AB).
+class RescaleToLegacySurvey:
+    """Formatter that rescales the images based on survey zeropoint."""
 
-    COSMOS images are already at ZP=23.9, so they pass through unchanged.
-    Euclid images are multiplied by 10^((COSMOS_ZP - EUCLID_ZP[band]) / 2.5).
-    """
+    def __init__(self):
+        pass
 
-    def _scale(self, band: str) -> float:
-        if band not in EUCLID_ZP:
-            return 1.0  # COSMOS band — no rescaling needed
-        return 10.0 ** ((COSMOS_ZP - EUCLID_ZP[band]) / 2.5)
+    def convert_zeropoint(self, zp: float) -> float:
+        """Convert zeropoint to scale factor."""
+        return 10.0 ** ((zp - 22.5) / 2.5)
 
-    def forward(self, image: torch.Tensor, band: str) -> torch.Tensor:
-        return image.clone() * self._scale(band)
+    def reverse_zeropoint(self, scale: float) -> float:
+        """Convert scale factor back to zeropoint."""
+        return 22.5 - 2.5 * torch.log10(scale)
 
-    def backward(self, image: torch.Tensor, band: str) -> torch.Tensor:
-        return image.clone() / self._scale(band)
+    def forward(self, image, survey):
+        """Rescale image by dividing by zeropoint scale factor."""
+        zpscale = self.convert_zeropoint(27.0) if (survey and survey.upper() == "HSC") else 1.0
+        image = image.clone()  # Avoid in-place modification
+        image /= zpscale
+        return image
+
+    def backward(self, image, survey):
+        """Reverse rescale by multiplying by zeropoint scale factor."""
+        zpscale = self.convert_zeropoint(27.0) if (survey and survey.upper() == "HSC") else 1.0
+        image = image.clone()  # Avoid in-place modification
+        image *= zpscale
+        return image
 
 
 class RangeCompress:
@@ -136,10 +147,10 @@ def get_survey(bands: list[str]) -> str:
     Extract survey name from band names.
 
     Args:
-        bands: List of band names (e.g., ['EUC-VIS', 'EUC-Y', ...])
+        bands: List of band names (e.g., ['HSC-G', 'HSC-R', ...])
 
     Returns:
-        Survey name (e.g., 'EUC' or 'COS')
+        Survey name (e.g., 'HSC' or 'DES')
     """
     if not bands:
         raise ValueError("bands list cannot be empty")
@@ -185,7 +196,7 @@ def preprocess_image(
 
     # Step 3: Rescale
     survey = get_survey(bands)
-    rescaler = RescaleToCOSMOS()
+    rescaler = RescaleToLegacySurvey()
     processed = rescaler.forward(processed.clone(), survey)
 
     # Step 4: Range compression (optional)
@@ -201,57 +212,53 @@ def preprocess_image(
 
 
 # Define ordered band lists for v2 lookup
-EUC_BANDS = ["EUC-VIS", "EUC-Y", "EUC-J", "EUC-K"]
-COSMOS_BANDS = ["COS-F115W", "COS-F150W", "COS-F277W", "COS-F444W"]
+HSC_BANDS = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+LEGACY_BANDS = ["DES-G", "DES-R", "DES-I", "DES-Z"]
 
 
-def preprocess_image_v2(
-    image: torch.Tensor,
-    crop_size: int = 96,
-    survey: str = "cosmos",
-    bands: list[str] | None = None,
-) -> torch.Tensor:
+def preprocess_image_v2(image: torch.Tensor, crop_size: int = 96, survey: str = "hsc") -> torch.Tensor:
     """
     Simplified preprocessing pipeline (V2).
 
-    Infers bands from survey name ('cosmos' or 'euclid') unless `bands` is
-    passed explicitly, in which case survey is ignored and any channel count works.
-    Expects input shape (C, H, W) or (B, C, H, W).
+    Automatically infers bands based on survey name ('hsc' or 'legacy').
+    Expects input shape (C, 160, 160) or (B, C, 160, 160).
     """
+    # 1. Standardize inputs
+    survey_key = survey.lower().strip()
+
     # Handle dimensions: Ensure [Batch, Channel, H, W] for the classes
     is_batched = image.ndim == 4
     if not is_batched:
         if image.ndim == 3:
-            image = image.unsqueeze(0)
+            image = image.unsqueeze(0) # [C, H, W] -> [1, C, H, W]
         else:
             raise ValueError(f"Image must be 3D or 4D tensor, got shape {image.shape}")
 
-    # Determine bands
-    if bands is None:
-        survey_key = survey.lower().strip()
-        if survey_key == 'cos':
-            bands = COSMOS_BANDS
-        elif survey_key == 'euc':
-            bands = EUC_BANDS
-        else:
-            raise ValueError(f"Unknown survey: '{survey}'. Supported: 'cosmos', 'euclid'")
-        if image.shape[1] != len(bands):
-            raise ValueError(
-                f"Survey '{survey}' expects {len(bands)} channels, got {image.shape[1]}"
-            )
+    # 2. Determine bands and validate channel count
+    if survey_key == 'hsc':
+        bands = HSC_BANDS
+        expected_channels = 5
+    elif survey_key == 'legacy':
+        bands = LEGACY_BANDS
+        expected_channels = 4
+    else:
+        raise ValueError(f"Unknown survey: '{survey}'. Supported: 'hsc', 'legacy'")
+
+    if image.shape[1] != expected_channels:
+        raise ValueError(f"Survey '{survey}' expects {expected_channels} channels, but got input with {image.shape[1]}")
 
     # 3. Pipeline Execution
 
     # Crop (Default 96)
-    # cropper = CenterCrop(crop_size=crop_size)
-    # processed = cropper(image)
+    cropper = CenterCrop(crop_size=crop_size)
+    processed = cropper(image)
 
     # Clamp
-    # clamper = Clamp()
-    # processed = clamper(processed.clone(), bands)
+    clamper = Clamp()
+    processed = clamper(processed.clone(), bands)
 
     # Rescale (Uses survey string to decide logic)
-    rescaler = RescaleToCOSMOS()
+    rescaler = RescaleToLegacySurvey()
     processed = rescaler.forward(processed.clone(), survey)
 
     # Range Compress (Defaults)
@@ -267,34 +274,57 @@ def preprocess_image_v2(
 
 
 def main():
-    """Demonstrate the preprocessing pipeline on one Euclid VIS and one COSMOS F115W cutout."""
+    """Demonstrate the full preprocessing pipeline."""
+    import glob
+    import os
     import numpy as np
-    from astropy.io import fits
+    from datasets import load_dataset
 
-    EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_032_147271e7TILE_101542815_14969272158331464_149.692722_1.968534_1502704970019216576_cutout.fits"
-    #COSMOS_FILE = "/n03data/fontirro/cosmos/120_cutouts/F115W_your_galaxy_id.fits"
+    # Load dataset
+    dataset_path = '/mnt/scratch/legacysurvey_hsc_crossmatched/data'
+    pattern = os.path.join(dataset_path, "*.parquet")
+    all_files = sorted(glob.glob(pattern))
+    dataset = load_dataset("parquet", data_files=all_files, split="train")
 
+    idx = 10
+    example_record = dataset[idx]
 
-    label,filepath,hdu_index, band =  "EUC-VIS", EUCLID_FILE, 1, "VIS"
+    # Get HSC image
+    hsc_image = np.array(example_record['hsc_image']['flux'])
+    hsc_image_tensor = torch.from_numpy(hsc_image).float()
+    print(f"Original HSC image shape: {hsc_image_tensor.shape}")
+
+    # Define bands
+    bands_in = ['HSC-G', 'HSC-R', 'HSC-I', 'HSC-Z', 'HSC-Y']
+    im_full = hsc_image_tensor.unsqueeze(0)  # Add batch dimension: [1, 5, 160, 160]
 
     print("\n" + "=" * 60)
-    print(f"PREPROCESSING PIPELINE — {label}")
+    print("FULL PREPROCESSING PIPELINE")
     print("=" * 60)
-
-    # Load image data.
-    with fits.open(filepath) as hdul:
-        data = hdul[hdu_index].data.astype(np.float32)
-    if data.ndim == 2:
-        data = data[np.newaxis]
-    im_full = torch.from_numpy(data).unsqueeze(0)  # (1, 1, H, W)
     print(f"\n1. Original image shape: {im_full.shape}")
     print(f"   Range: [{im_full.min():.4f}, {im_full.max():.4f}]")
 
-    # Step 3: Rescale Euclid to COSMOS ZP (23.9); COSMOS passes through unchanged
-    rescaler = RescaleToCOSMOS()
-    im_rescaled = rescaler.forward(im_full.clone(), band)
-    print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
+    # Step 1: Center crop
+    cropper = CenterCrop(crop_size=96)
+    im_cropped = cropper(im_full)
+    print(f"\n2. After center_crop (96x96): {im_cropped.shape}")
+    print(f"   Range: [{im_cropped.min():.4f}, {im_cropped.max():.4f}]")
+
+    # Step 2: Clamp
+    clamper = Clamp()
+    im_clamped = clamper(im_cropped.clone(), bands_in)
+    print(f"\n3. After clamp: {im_clamped.shape}")
+    print(f"   Range: [{im_clamped.min():.4f}, {im_clamped.max():.4f}]")
+    print(f"   (Clamped to band-specific ranges)")
+
+    # Step 3: Rescale to Legacy Survey
+    survey = get_survey(bands_in)
+    rescaler = RescaleToLegacySurvey()
+    im_rescaled = rescaler.forward(im_clamped.clone(), survey)
+    print(f"\n4. After rescale.forward (survey={survey}): {im_rescaled.shape}")
     print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+    zpscale = rescaler.convert_zeropoint(27.0) if survey == "HSC" else 1.0
+    print(f"   Zeropoint scale factor: {zpscale:.6f}")
 
     # Step 4: Range compression
     range_compression_factor = 0.01
@@ -304,7 +334,7 @@ def main():
         mult_factor=mult_factor,
     )
     im_range_compressed = range_compressor.forward(im_rescaled.clone())
-    print(f"\n3. After range_compress: {im_range_compressed.shape}")
+    print(f"\n5. After range_compress: {im_range_compressed.shape}")
     print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
     print(f"   range_compression_factor: {range_compression_factor}")
     print(f"   mult_factor: {mult_factor}")
@@ -314,16 +344,25 @@ def main():
     print("\n" + "=" * 60)
     print("SUMMARY OF TRANSFORMATIONS")
     print("=" * 60)
-    print(f"Original range:    [{im_full.min():.4f}, {im_full.max():.4f}]")
-    print(f"Rescaled range:    [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
-    print(f"Range compressed:  [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+    print(f"Original range:      [{im_full.min():.4f}, {im_full.max():.4f}]")
+    print(f"Cropped range:      [{im_cropped.min():.4f}, {im_cropped.max():.4f}]")
+    print(f"Clamped range:      [{im_clamped.min():.4f}, {im_clamped.max():.4f}]")
+    print(f"Rescaled range:     [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+    print(f"Range compressed:   [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
     print("=" * 60)
 
-    # Comparison: preprocess_image_v2 with explicit bands
+    # Demonstrate using the convenience function
     print("\n" + "=" * 60)
-    print("USING preprocess_image_v2 FUNCTION: preprocess_image_v2()")
+    print("USING CONVENIENCE FUNCTION: preprocess_image()")
     print("=" * 60)
-    im_preprocessed = preprocess_image_v2(im_full, bands=[band])
+    im_preprocessed = preprocess_image(
+        im_full,
+        bands_in,
+        crop_size=96,
+        range_compression_factor=range_compression_factor,
+        mult_factor=mult_factor,
+        apply_range_compression=True,
+    )
     print(f"Preprocessed image shape: {im_preprocessed.shape}")
     print(f"Preprocessed image range: [{im_preprocessed.min():.4f}, {im_preprocessed.max():.4f}]")
     print("=" * 60)
