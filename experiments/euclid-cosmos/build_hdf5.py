@@ -1,15 +1,17 @@
 """
 Build an HDF5 file with paired Euclid (VIS) and COSMOS (F115W) cutouts.
 
-Each pair is stored as a separate dataset inside two HDF5 groups ('euclid' and 'cosmos')
-to support variable spatial sizes across cutouts.
+The native spatial size of the first file in each instrument is used to
+pre-allocate the datasets. All images of the same instrument are assumed
+to share the same size. Datasets follow the (N, C, H, W) layout from
+new_dataset_guide.md.
 
 HDF5 layout:
-    euclid/{i}            — (1, H, W) float32, preprocessed Euclid VIS cutout
-    cosmos/{i}            — (1, H, W) float32, preprocessed COSMOS F115W cutout
+    euclid_images         — (N, 1, H_euc, W_euc) float32
+    cosmos_images         — (N, 1, H_cos, W_cos) float32
     catalog/euclid_paths  — string array (N,)
     catalog/cosmos_paths  — string array (N,)
-    num_pairs             — scalar int
+    attrs: num_pairs, num_channels, euclid_shape, cosmos_shape
 
 Preprocessing (via preprocess_image_v2):
     Euclid : ZP rescaling (ZP 26.2 → 23.9), no range compression
@@ -47,9 +49,7 @@ import h5py
 from astropy.io import fits
 import torch
 
-# Allow running without installing the package
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src"))
-from galaxy_counter.preprocessing.image_preprocessing import preprocess_image_v2
+from image_preprocessing import preprocess_image_v2
 
 
 def load_fits(path: str, hdu: int) -> torch.Tensor:
@@ -61,24 +61,45 @@ def load_fits(path: str, hdu: int) -> torch.Tensor:
     return torch.from_numpy(data).unsqueeze(0)  # (1, 1, H, W)
 
 
+def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
+    """Return (H, W) of the first valid file."""
+    with fits.open(path) as hdul:
+        data = hdul[hdu].data
+    return data.shape[-2], data.shape[-1]
+
+
 def main():
     catalog = pd.read_csv(CATALOG_PATH)
     print(f"Catalog loaded: {len(catalog)} pairs")
     print(f"Columns: {list(catalog.columns)}")
 
-    euclid_paths = catalog[EUCLID_COL].tolist()
-    cosmos_paths = catalog[COSMOS_COL].tolist()
+    euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
+    cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
     N = len(euclid_paths)
 
-    with h5py.File(OUTPUT_H5, "w") as f:
-        euc_grp = f.create_group("euclid")
-        cos_grp = f.create_group("cosmos")
-        cat_grp = f.create_group("catalog")
+    # Determine spatial sizes from first file of each instrument
+    H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
+    H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
+    print(f"Euclid image size : {H_euc} × {W_euc}")
+    print(f"COSMOS image size : {H_cos} × {W_cos}")
 
+    with h5py.File(OUTPUT_H5, "w") as f:
+        euc_ds = f.create_dataset(
+            "euclid_images", shape=(N, 1, H_euc, W_euc),
+            dtype=np.float32, compression="gzip", compression_opts=4,
+        )
+        cos_ds = f.create_dataset(
+            "cosmos_images", shape=(N, 1, H_cos, W_cos),
+            dtype=np.float32, compression="gzip", compression_opts=4,
+        )
+        cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
         cat_grp.create_dataset("cosmos_paths", data=np.array(cosmos_paths, dtype=object), dtype=dt)
         f.attrs["num_pairs"] = N
+        f.attrs["num_channels"] = 1
+        f.attrs["euclid_shape"] = [H_euc, W_euc]
+        f.attrs["cosmos_shape"] = [H_cos, W_cos]
 
         skipped = 0
         for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths)):
@@ -96,9 +117,9 @@ def main():
                 skipped += 1
                 continue
 
-            # squeeze batch dim: (1, 1, H, W) → (1, H, W)
-            euc_grp.create_dataset(str(i), data=euc_processed.squeeze(0).numpy(), compression="gzip", compression_opts=4)
-            cos_grp.create_dataset(str(i), data=cos_processed.squeeze(0).numpy(), compression="gzip", compression_opts=4)
+            # store: squeeze batch dim (1, 1, H, W) → (1, H, W)
+            euc_ds[i] = euc_processed.squeeze(0).numpy()
+            cos_ds[i] = cos_processed.squeeze(0).numpy()
 
     print(f"\nDone. {N - skipped}/{N} pairs written to {OUTPUT_H5}")
     if skipped:

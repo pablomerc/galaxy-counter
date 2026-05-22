@@ -222,7 +222,7 @@ def preprocess_image_v2(
     is_batched = image.ndim == 4
     if not is_batched:
         if image.ndim == 3:
-            image = image.unsqueeze(0)
+            image = image.unsqueeze(0) # (C, H, W) → (1, C, H, W)
         else:
             raise ValueError(f"Image must be 3D or 4D tensor, got shape {image.shape}")
 
@@ -256,7 +256,7 @@ def preprocess_image_v2(
     for i, band in enumerate(bands):
         processed[:, i, :, :] = rescaler.forward(processed[:, i:i+1, :, :], band)[:, 0, :, :]
 
-    # Range Compress — skip for Euclid (already compressed)
+    # Range Compress (asinh)— skip for Euclid (already compressed)
     is_euclid = any(b in EUCLID_ZP for b in bands)
     if not is_euclid:
         range_compressor = RangeCompress()
@@ -265,7 +265,7 @@ def preprocess_image_v2(
     # 4. Output handling
     # If input was not batched (3D), return 3D. If batched, return 4D.
     if not is_batched:
-        processed = processed.squeeze(0)
+        processed = processed.squeeze(0) # (1, C, H, W) → (C, H, W)
 
     return processed
 
