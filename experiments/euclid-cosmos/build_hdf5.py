@@ -26,15 +26,18 @@ import os
 # CONFIG — edit these before running
 # ---------------------------------------------------------------------------
 
-CATALOG_PATH = "/n03data/fontirro/euclid/catalog.csv"  # path to the paired catalog
+CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27.csv"  # path to the paired catalog
 
-EUCLID_COL = "euclid_path"    # column name for the Euclid FITS file path
-COSMOS_COL = "cosmos_path"    # column name for the COSMOS FITS file path
+EUCLID_COL = "file_euclid_vis"    # column name for the Euclid FITS file path
+COSMOS_COL = "file_cosmos_f115w"    # column name for the COSMOS FITS file path
+
+EUCLID_DIR_PATH = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
+COSMOS_DIR_PATH = "/n03data/fontirro/cosmos/cosmos/120_cutouts/f115w/"  # base directory for COSMOS F115W cutouts.
 
 EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
-OUTPUT_H5 = "/n03data/fontirro/euclid_cosmos_pairs.h5"
+OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
 
 # ---------------------------------------------------------------------------
 
