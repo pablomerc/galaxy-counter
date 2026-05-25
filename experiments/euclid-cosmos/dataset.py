@@ -31,7 +31,6 @@ import torch
 from torch.utils.data import Dataset
 
 # Per-survey [mean, std] of preprocessed pixel values.
-# TODO: measure these from the actual data with compute_norm_stats() below.
 NORM_DICT = {
     "euclid": [0.037, 0.024],
     "cosmos": [0.007, 0.158],
