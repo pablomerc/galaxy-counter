@@ -37,10 +37,20 @@ from galaxy_counter.models.double_train_fm_neighbors import ConditionalFlowMatch
 
 
 class EuclidCosmosModel(ConditionalFlowMatchingModule):
-    """Subclass that disables the wandb image-grid visualization from the base class.
-    The base class on_validation_epoch_end assumes 3-channel images and a wandb logger,
-    neither of which applies here (1-channel images, CSV logger).
+    """Subclass that disables wandb-specific hooks from the base class.
+    The base class assumes a wandb logger and 3-channel images; we use a CSV
+    logger and 1-channel images, so those hooks are replaced with no-ops.
     """
+    def on_train_start(self) -> None:
+        import time
+        self._train_start_time = time.time()
+        print(f"\n{'='*60}")
+        print(f"Training started - Target: {self.trainer.max_steps} steps")
+        if torch.cuda.is_available():
+            for i in range(torch.cuda.device_count()):
+                print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
+        print(f"{'='*60}\n")
+
     def on_validation_epoch_end(self) -> None:
         pass
 
