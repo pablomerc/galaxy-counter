@@ -30,8 +30,11 @@ import os
 
 CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27.csv"  # path to the paired catalog
 
-EUCLID_COL = "file_euclid_vis"    # column name for the Euclid FITS file path
-COSMOS_COL = "file_cosmos_f115w"    # column name for the COSMOS FITS file path
+EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file path
+COSMOS_COL = "file_cosmos_f115w"            # column name for the COSMOS FITS file path
+
+EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
+COSMOS_EXISTS_COL = "cutout_cos_120_115w"  # boolean column: True if COSMOS cutout exists
 
 EUCLID_DIR_PATH = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
 COSMOS_DIR_PATH = "/n03data/fontirro/cosmos/cosmos/120_cutouts/f115w/"  # base directory for COSMOS F115W cutouts.
@@ -71,7 +74,12 @@ def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
 def main():
     catalog = pd.read_csv(CATALOG_PATH)
     print(f"Catalog loaded: {len(catalog)} pairs")
-    print(f"Columns: {list(catalog.columns)}")
+    #print(f"Columns: {list(catalog.columns)}")
+
+    # Keep only rows where both cutouts exist
+    mask = catalog[EUCLID_EXISTS_COL] & catalog[COSMOS_EXISTS_COL]
+    catalog = catalog[mask].reset_index(drop=True)
+    print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
 
     euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
     cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
