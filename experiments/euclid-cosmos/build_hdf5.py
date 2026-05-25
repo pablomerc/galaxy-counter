@@ -44,7 +44,7 @@ COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
 OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
 
-NUM_WORKERS = 8  # parallel threads for loading + preprocessing
+NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
 # ---------------------------------------------------------------------------
 
@@ -95,7 +95,7 @@ def process_pair(args: tuple) -> tuple:
 def main():
     catalog = pd.read_csv(CATALOG_PATH)
     print(f"Catalog loaded: {len(catalog)} pairs")
-    print(f"Columns: {list(catalog.columns)}")
+    #print(f"Columns: {list(catalog.columns)}")
 
     mask = (catalog[EUCLID_EXISTS_COL] == 1) & (catalog[COSMOS_EXISTS_COL] == 1)
     catalog = catalog[mask]
