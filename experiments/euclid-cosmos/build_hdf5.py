@@ -51,7 +51,6 @@ import pandas as pd
 import h5py
 from astropy.io import fits
 import torch
-from skimage.transform import resize
 import torch.nn.functional as F
 from image_preprocessing import preprocess_image_v2
 
