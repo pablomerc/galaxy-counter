@@ -23,7 +23,7 @@ import sys
 import torch
 from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 # Allow running from repo root or from the experiment directory
@@ -49,7 +49,6 @@ IMAGE_SIZE  = 40      # Euclid cutout spatial size
 LR          = 1e-4
 
 N_GPUS      = 1       # set to number of GPUs on the node
-WANDB_PROJECT = "galaxy-flow-matching-euclid-cosmos"
 # ---------------------------------------------------------------------------
 
 
@@ -121,17 +120,7 @@ def main():
         mask_center=False,
     )
 
-    wandb_logger = WandbLogger(
-        project=WANDB_PROJECT,
-        name=f"phase1-pairs-img{IMAGE_SIZE}-ch128",
-        log_model=False,
-        config={
-            "batch_size": BATCH_SIZE,
-            "image_size": IMAGE_SIZE,
-            "dataset": H5_PATH,
-            "phase": 1,
-        },
-    )
+    csv_logger = CSVLogger(save_dir=CKPT_DIR, name="logs")
 
     os.makedirs(CKPT_DIR, exist_ok=True)
     best_checkpoint = ModelCheckpoint(
@@ -151,7 +140,7 @@ def main():
 
     trainer = pl.Trainer(
         max_steps=max(1, int(NUM_STEPS / N_GPUS)),
-        logger=wandb_logger,
+        logger=csv_logger,
         accelerator="auto",
         devices=N_GPUS,
         strategy="ddp_find_unused_parameters_true" if N_GPUS > 1 else "auto",
