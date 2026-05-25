@@ -44,12 +44,16 @@ COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
 OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
 
+NUM_WORKERS = 8  # parallel threads for loading + preprocessing
+
 # ---------------------------------------------------------------------------
 
 import numpy as np
 import pandas as pd
 import h5py
 from astropy.io import fits
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 from image_preprocessing import preprocess_image_v2
@@ -60,7 +64,7 @@ def load_fits(path: str, hdu: int) -> torch.Tensor:
     with fits.open(path) as hdul:
         data = hdul[hdu].data.astype(np.float32)
     if data.ndim == 2:
-        data = data[np.newaxis]        # (H, W) → (1, H, W)
+        data = data[np.newaxis]
     return torch.from_numpy(data).unsqueeze(0)  # (1, 1, H, W)
 
 
@@ -71,12 +75,28 @@ def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
     return data.shape[-2], data.shape[-1]
 
 
+def process_pair(args: tuple) -> tuple:
+    """Load, preprocess, and downscale one pair. Returns (i, euc, cos, cos_down, error)."""
+    i, ep, cp, h_euc, w_euc = args
+    try:
+        euc_tensor = load_fits(ep, EUCLID_HDU)
+        cos_tensor = load_fits(cp, COSMOS_HDU)
+        euc = preprocess_image_v2(euc_tensor, bands=["VIS"]).squeeze(0).numpy()
+        cos = preprocess_image_v2(cos_tensor, bands=["F115W"]).squeeze(0).numpy()
+        cos_down = F.interpolate(
+            torch.from_numpy(cos).unsqueeze(0), size=(h_euc, w_euc),
+            mode="bilinear", align_corners=False,
+        ).squeeze(0).numpy()
+        return i, euc, cos, cos_down, None
+    except Exception as e:
+        return i, None, None, None, str(e)
+
+
 def main():
     catalog = pd.read_csv(CATALOG_PATH)
     print(f"Catalog loaded: {len(catalog)} pairs")
     print(f"Columns: {list(catalog.columns)}")
 
-    # Keep only rows where both cutouts exist
     mask = (catalog[EUCLID_EXISTS_COL] == 1) & (catalog[COSMOS_EXISTS_COL] == 1)
     catalog = catalog[mask]
     print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
@@ -85,26 +105,17 @@ def main():
     cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
     N = len(euclid_paths)
 
-    # Determine spatial sizes from first file of each instrument
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
     H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
     print(f"Euclid image size : {H_euc} × {W_euc}")
     print(f"COSMOS image size : {H_cos} × {W_cos}")
 
+    args_list = [(i, ep, cp, H_euc, W_euc) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
+
     with h5py.File(OUTPUT_H5, "w") as f:
-        euc_ds = f.create_dataset(
-            "euclid_images", shape=(N, 1, H_euc, W_euc),
-            dtype=np.float32, compression="gzip", compression_opts=4,
-        )
-        cos_ds = f.create_dataset(
-            "cosmos_images", shape=(N, 1, H_cos, W_cos),
-            dtype=np.float32, compression="gzip", compression_opts=4,
-        )
-        # COSMOS downscaled in-memory to match Euclid size (no new files written)
-        cos_down_ds = f.create_dataset(
-            "cosmos_images_downscaled", shape=(N, 1, H_euc, W_euc),
-            dtype=np.float32, compression="gzip", compression_opts=4,
-        )
+        euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32, compression="gzip", compression_opts=4)
+        cos_ds = f.create_dataset("cosmos_images", shape=(N, 1, H_cos, W_cos), dtype=np.float32, compression="gzip", compression_opts=4)
+        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 1, H_euc, W_euc), dtype=np.float32, compression="gzip", compression_opts=4)
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
@@ -115,28 +126,17 @@ def main():
         f.attrs["cosmos_shape"] = [H_cos, W_cos]
 
         skipped = 0
-        for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths)):
-            if i % 100 == 0:
-                print(f"  [{i}/{N}] processing...")
-
-            try:
-                euc_tensor = load_fits(ep, EUCLID_HDU)
-                cos_tensor = load_fits(cp, COSMOS_HDU)
-
-                euc_processed = preprocess_image_v2(euc_tensor, bands=["VIS"])    # ZP rescale only
-                cos_processed = preprocess_image_v2(cos_tensor, bands=["F115W"])  # range compress only
-
-                # Downscale COSMOS in-memory to Euclid size
-                cos_downscaled = F.interpolate(cos_processed, size=(H_euc, W_euc), mode="bilinear", align_corners=False)
-            except Exception as e:
-                print(f"  [WARN] skipping pair {i}: {e}")
-                skipped += 1
-                continue
-
-            # store: squeeze batch dim (1, 1, H, W) → (1, H, W)
-            euc_ds[i] = euc_processed.squeeze(0).numpy() #converts pytorch tensor to numpy array and removes the batch dimension.
-            cos_ds[i] = cos_processed.squeeze(0).numpy() #we do this because h5py datasets expect numpy arrays.
-            cos_down_ds[i] = cos_downscaled.squeeze(0).numpy()
+        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            futures = {executor.submit(process_pair, args): args[0] for args in args_list}
+            for future in tqdm(as_completed(futures), total=N, desc="Processing"):
+                i, euc, cos, cos_down, err = future.result()
+                if err:
+                    print(f"\n  [WARN] skipping pair {i}: {err}")
+                    skipped += 1
+                    continue
+                euc_ds[i] = euc
+                cos_ds[i] = cos
+                cos_down_ds[i] = cos_down
 
     print(f"\nDone. {N - skipped}/{N} pairs written to {OUTPUT_H5}")
     if skipped:
