@@ -128,7 +128,7 @@ def main():
         skipped = 0
         with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
             futures = {executor.submit(process_pair, args): args[0] for args in args_list}
-            for future in tqdm(as_completed(futures), total=N, desc="Processing"):
+            for future in tqdm(as_completed(futures), total=N, desc="Processing", mininterval=60, dynamic_ncols=False):
                 i, euc, cos, cos_down, err = future.result()
                 if err:
                     print(f"\n  [WARN] skipping pair {i}: {err}")
