@@ -1,7 +1,7 @@
 """
 TEST!!!!!!!!
 
-Train the flow-matching model on paired Euclid (VIS) × COSMOS (F115W) cutouts.
+Train the flow-matching model on paired Euclid (VIS) x COSMOS (F115W) cutouts.
 
 Phase 1 (this script): simple pairs, no same-instrument neighbors.
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
