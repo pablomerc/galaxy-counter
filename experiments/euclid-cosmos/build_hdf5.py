@@ -52,7 +52,7 @@ import numpy as np
 import pandas as pd
 import h5py
 from astropy.io import fits
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
@@ -113,9 +113,9 @@ def main():
     args_list = [(i, ep, cp, H_euc, W_euc) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
 
     with h5py.File(OUTPUT_H5, "w") as f:
-        euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32, compression="gzip", compression_opts=4)
-        cos_ds = f.create_dataset("cosmos_images", shape=(N, 1, H_cos, W_cos), dtype=np.float32, compression="gzip", compression_opts=4)
-        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 1, H_euc, W_euc), dtype=np.float32, compression="gzip", compression_opts=4)
+        euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
+        cos_ds = f.create_dataset("cosmos_images", shape=(N, 1, H_cos, W_cos), dtype=np.float32)
+        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
@@ -126,10 +126,10 @@ def main():
         f.attrs["cosmos_shape"] = [H_cos, W_cos]
 
         skipped = 0
-        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-            futures = {executor.submit(process_pair, args): args[0] for args in args_list}
-            for future in tqdm(as_completed(futures), total=N, desc="Processing", mininterval=60, dynamic_ncols=False):
-                i, euc, cos, cos_down, err = future.result()
+        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            results = executor.map(process_pair, args_list, chunksize=100)
+            for result in tqdm(results, total=N, desc="Processing", mininterval=60, dynamic_ncols=False):
+                i, euc, cos, cos_down, err = result
                 if err:
                     print(f"\n  [WARN] skipping pair {i}: {err}")
                     skipped += 1
