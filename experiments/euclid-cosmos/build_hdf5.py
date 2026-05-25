@@ -51,7 +51,8 @@ import pandas as pd
 import h5py
 from astropy.io import fits
 import torch
-
+from skimage.transform import resize
+import torch.nn.functional as F
 from image_preprocessing import preprocess_image_v2
 
 
@@ -91,8 +92,6 @@ def main():
     print(f"Euclid image size : {H_euc} × {W_euc}")
     print(f"COSMOS image size : {H_cos} × {W_cos}")
 
-    return  # remove this line after verifying the above info
-
     with h5py.File(OUTPUT_H5, "w") as f:
         euc_ds = f.create_dataset(
             "euclid_images", shape=(N, 1, H_euc, W_euc),
@@ -100,6 +99,11 @@ def main():
         )
         cos_ds = f.create_dataset(
             "cosmos_images", shape=(N, 1, H_cos, W_cos),
+            dtype=np.float32, compression="gzip", compression_opts=4,
+        )
+        # COSMOS downscaled in-memory to match Euclid size (no new files written)
+        cos_down_ds = f.create_dataset(
+            "cosmos_images_downscaled", shape=(N, 1, H_euc, W_euc),
             dtype=np.float32, compression="gzip", compression_opts=4,
         )
         cat_grp = f.create_group("catalog")
@@ -122,14 +126,18 @@ def main():
 
                 euc_processed = preprocess_image_v2(euc_tensor, bands=["VIS"])    # ZP rescale only
                 cos_processed = preprocess_image_v2(cos_tensor, bands=["F115W"])  # range compress only
+
+                # Downscale COSMOS in-memory to Euclid size
+                cos_downscaled = F.interpolate(cos_processed, size=(H_euc, W_euc), mode="bilinear", align_corners=False)
             except Exception as e:
                 print(f"  [WARN] skipping pair {i}: {e}")
                 skipped += 1
                 continue
 
             # store: squeeze batch dim (1, 1, H, W) → (1, H, W)
-            euc_ds[i] = euc_processed.squeeze(0).numpy()
-            cos_ds[i] = cos_processed.squeeze(0).numpy()
+            euc_ds[i] = euc_processed.squeeze(0).numpy() #converts pytorch tensor to numpy array and removes the batch dimension.
+            cos_ds[i] = cos_processed.squeeze(0).numpy() #we do this because h5py datasets expect numpy arrays.
+            cos_down_ds[i] = cos_downscaled.squeeze(0).numpy()
 
     print(f"\nDone. {N - skipped}/{N} pairs written to {OUTPUT_H5}")
     if skipped:
