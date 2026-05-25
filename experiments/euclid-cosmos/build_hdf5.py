@@ -83,6 +83,8 @@ def main():
     print(f"Euclid image size : {H_euc} × {W_euc}")
     print(f"COSMOS image size : {H_cos} × {W_cos}")
 
+    return  # remove this line after verifying the above info
+
     with h5py.File(OUTPUT_H5, "w") as f:
         euc_ds = f.create_dataset(
             "euclid_images", shape=(N, 1, H_euc, W_euc),
