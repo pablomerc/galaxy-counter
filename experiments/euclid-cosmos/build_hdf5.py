@@ -77,8 +77,8 @@ def main():
     print(f"Columns: {list(catalog.columns)}")
 
     # Keep only rows where both cutouts exist
-    mask = catalog[EUCLID_EXISTS_COL] & catalog[COSMOS_EXISTS_COL]
-    catalog = catalog[mask].reset_index(drop=True)
+    mask = (catalog[EUCLID_EXISTS_COL] == 1) & (catalog[COSMOS_EXISTS_COL] == 1)
+    catalog = catalog[mask]
     print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
 
     euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
