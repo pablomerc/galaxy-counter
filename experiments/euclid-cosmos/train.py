@@ -35,6 +35,15 @@ from dataset import EuclidCosmosDataset
 
 from galaxy_counter.models.double_train_fm_neighbors import ConditionalFlowMatchingModule
 
+
+class EuclidCosmosModel(ConditionalFlowMatchingModule):
+    """Subclass that disables the wandb image-grid visualization from the base class.
+    The base class on_validation_epoch_end assumes 3-channel images and a wandb logger,
+    neither of which applies here (1-channel images, CSV logger).
+    """
+    def on_validation_epoch_end(self) -> None:
+        pass
+
 # ---------------------------------------------------------------------------
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
@@ -102,7 +111,7 @@ def main():
         pin_memory=True,
     )
 
-    model = ConditionalFlowMatchingModule(
+    model = EuclidCosmosModel(
         in_channels=1,            # Euclid VIS: 1 channel
         cond_channels=1,          # COSMOS F115W: 1 channel
         image_size=IMAGE_SIZE,
