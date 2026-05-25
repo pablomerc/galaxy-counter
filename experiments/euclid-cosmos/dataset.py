@@ -113,14 +113,9 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
 
 
 def main():
-    import sys
     from torch.utils.data import DataLoader
 
-    if len(sys.argv) < 2:
-        print("Usage: python dataset.py <path/to/euclid_cosmos_pairs.h5>")
-        sys.exit(1)
-
-    H5_PATH = sys.argv[1]
+    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
 
     print("Computing normalization stats...")
     stats = compute_norm_stats(H5_PATH)
