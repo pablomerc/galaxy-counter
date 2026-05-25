@@ -568,62 +568,62 @@ if __name__ == "__main__":
         # CONFIGURATION
     # Use the MERGED file path here
     # H5_PATH = "/data/vision/billf/scratch/pablomer/data/neighbor_batches/neighbours_vds.h5"
-    H5_PATH = "/data/vision/billf/scratch/pablomer/data/neighbor_batches/neighbors_shard_0000.h5"
-    BATCH_SIZE = 64
+    # H5_PATH = "/data/vision/billf/scratch/pablomer/data/neighbor_batches/neighbors_shard_0000.h5"
+    # BATCH_SIZE = 64
 
-    # 1. Init Dataset (Loads to RAM)
-    dataset = NeighborsPrecomputedDataset(H5_PATH)
+    # # 1. Init Dataset (Loads to RAM)
+    # dataset = NeighborsPrecomputedDataset(H5_PATH)
 
-    # 2. Init Loader
-    # Note: num_workers=0 is usually FASTER for in-memory datasets because
-    # it avoids pickling overhead between processes.
-    loader = DataLoader(
-        dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=True, # We can shuffle freely now!
-        num_workers=0,
-        collate_fn=simple_collate
-    )
+    # # 2. Init Loader
+    # # Note: num_workers=0 is usually FASTER for in-memory datasets because
+    # # it avoids pickling overhead between processes.
+    # loader = DataLoader(
+    #     dataset,
+    #     batch_size=BATCH_SIZE,
+    #     shuffle=True, # We can shuffle freely now!
+    #     num_workers=0,
+    #     collate_fn=simple_collate
+    # )
 
-    # Visualize first batch
-    first_batch = next(iter(loader))
-    plot_option2_first_batch(
-        first_batch,
-        save_path="neighbors_option2_first_batch.png",
-        num_samples=4,
-        max_neighbors_show=5,
-    )
+    # # Visualize first batch
+    # first_batch = next(iter(loader))
+    # plot_option2_first_batch(
+    #     first_batch,
+    #     save_path="neighbors_option2_first_batch.png",
+    #     num_samples=4,
+    #     max_neighbors_show=5,
+    # )
 
-    num_batches_total = len(loader)  # may be small if using a single shard
-    NUM_BATCHES = min(100, num_batches_total)
-    print(f"\nStarting benchmark with Batch Size {BATCH_SIZE} ({num_batches_total} batches in dataset, timing {NUM_BATCHES})...")
+    # num_batches_total = len(loader)  # may be small if using a single shard
+    # NUM_BATCHES = min(100, num_batches_total)
+    # print(f"\nStarting benchmark with Batch Size {BATCH_SIZE} ({num_batches_total} batches in dataset, timing {NUM_BATCHES})...")
 
-    # Warmup (don't exceed available batches)
-    iter_loader = iter(loader)
-    for _ in range(min(5, num_batches_total)):
-        next(iter_loader)
+    # # Warmup (don't exceed available batches)
+    # iter_loader = iter(loader)
+    # for _ in range(min(5, num_batches_total)):
+    #     next(iter_loader)
 
-    # Timing: run up to NUM_BATCHES or until iterator is exhausted
-    t_start = time.time()
-    count = 0
-    for i in tqdm(range(NUM_BATCHES), desc="Benchmark"):
-        try:
-            batch = next(iter_loader)
-        except StopIteration:
-            break
-        count += 1
-        # simulate transfer to GPU
-        # [x.cuda() for x in batch if isinstance(x, torch.Tensor)]
+    # # Timing: run up to NUM_BATCHES or until iterator is exhausted
+    # t_start = time.time()
+    # count = 0
+    # for i in tqdm(range(NUM_BATCHES), desc="Benchmark"):
+    #     try:
+    #         batch = next(iter_loader)
+    #     except StopIteration:
+    #         break
+    #     count += 1
+    #     # simulate transfer to GPU
+    #     # [x.cuda() for x in batch if isinstance(x, torch.Tensor)]
 
-    t_end = time.time()
-    if count == 0:
-        print("No batches to time.")
-    else:
-        total_samples = count * BATCH_SIZE
-        fps = total_samples / (t_end - t_start)
-        print(f"\nDone.")
-        print(f"Throughput: {fps:.1f} samples/sec")
-        print(f"Time per batch: {(t_end - t_start) / count * 1000:.2f} ms")
+    # t_end = time.time()
+    # if count == 0:
+    #     print("No batches to time.")
+    # else:
+    #     total_samples = count * BATCH_SIZE
+    #     fps = total_samples / (t_end - t_start)
+    #     print(f"\nDone.")
+    #     print(f"Throughput: {fps:.1f} samples/sec")
+    #     print(f"Time per batch: {(t_end - t_start) / count * 1000:.2f} ms")
 
 
     # #########################################################
