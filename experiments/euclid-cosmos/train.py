@@ -27,7 +27,10 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 # Allow running from repo root or from the experiment directory
-sys.path.insert(0, os.path.dirname(__file__))
+_here = os.path.dirname(__file__)
+_repo_root = os.path.abspath(os.path.join(_here, "..", ".."))
+sys.path.insert(0, _here)
+sys.path.insert(0, os.path.join(_repo_root, "src"))
 from dataset import EuclidCosmosDataset
 
 from galaxy_counter.models.double_train_fm_neighbors import ConditionalFlowMatchingModule
