@@ -11,4 +11,4 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-python build_hdf5.py
+python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/build_hdf5.py
