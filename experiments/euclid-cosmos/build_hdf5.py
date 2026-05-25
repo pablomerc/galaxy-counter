@@ -37,7 +37,7 @@ EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cuto
 COSMOS_EXISTS_COL = "cutout_cos_120_115w"  # boolean column: True if COSMOS cutout exists
 
 EUCLID_DIR_PATH = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
-COSMOS_DIR_PATH = "/n03data/fontirro/cosmos/cosmos/120_cutouts/f115w/"  # base directory for COSMOS F115W cutouts.
+COSMOS_DIR_PATH = "/n03data/fontirro/cosmos/120_cutouts/f115w/"  # base directory for COSMOS F115W cutouts.
 
 EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
