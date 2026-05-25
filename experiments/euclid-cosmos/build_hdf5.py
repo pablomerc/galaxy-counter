@@ -74,7 +74,7 @@ def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
 def main():
     catalog = pd.read_csv(CATALOG_PATH)
     print(f"Catalog loaded: {len(catalog)} pairs")
-    #print(f"Columns: {list(catalog.columns)}")
+    print(f"Columns: {list(catalog.columns)}")
 
     # Keep only rows where both cutouts exist
     mask = catalog[EUCLID_EXISTS_COL] & catalog[COSMOS_EXISTS_COL]
