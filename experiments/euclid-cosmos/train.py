@@ -171,7 +171,9 @@ def main():
         num_sanity_val_steps=2,
     )
 
-    trainer.fit(model, train_loader, val_loader)
+    # Set to the latest checkpoint path to resume, or None to start fresh
+    RESUME_FROM = '/n03data/fontirro/checkpoints/euclid-cosmos-phase1/latest-step=66000.ckpt'
+    trainer.fit(model, train_loader, val_loader, ckpt_path=RESUME_FROM)
 
 
 if __name__ == "__main__":
