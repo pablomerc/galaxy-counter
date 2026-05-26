@@ -63,7 +63,7 @@ CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1"
 BATCH_SIZE  = 64
 NUM_WORKERS = 8
 VAL_RATIO   = 0.05
-NUM_STEPS   = 200_000
+NUM_STEPS   = 100_000
 IMAGE_SIZE  = 40      # Euclid cutout spatial size
 LR          = 1e-4
 
@@ -172,7 +172,7 @@ def main():
     )
 
     # Set to the latest checkpoint path to resume, or None to start fresh
-    RESUME_FROM = '/n03data/fontirro/checkpoints/euclid-cosmos-phase1/latest-step=66000.ckpt'
+    RESUME_FROM = None
     trainer.fit(model, train_loader, val_loader, ckpt_path=RESUME_FROM)
 
 
