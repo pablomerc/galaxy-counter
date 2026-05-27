@@ -1,14 +1,14 @@
 """
-Evaluate the trained Euclid x COSMOS flow-matching model.
+Test the trained Euclid x COSMOS flow-matching model.
 
 Loads a checkpoint, generates Euclid images from COSMOS inputs, and saves a
 figure with rows of: [COSMOS input | Generated Euclid | Real Euclid].
 
 Usage:
-    python experiments/euclid-cosmos/evaluate.py \
+    python experiments/euclid-cosmos/testing.py \
         --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-epoch=XX-step=XXXXX.ckpt \
         --h5 /n03data/fontirro/data_files/euclid_cosmos_pairs.h5 \
-        --out evaluation.png \
+        --out test.png \
         --n-samples 8
 """
 
@@ -44,7 +44,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True, help="Path to .ckpt file")
     p.add_argument("--h5", required=True, help="Path to euclid_cosmos_pairs.h5")
-    p.add_argument("--out", default="evaluation.png", help="Output figure path")
+    p.add_argument("--out", default="test.png", help="Output figure path")
     p.add_argument("--n-samples", type=int, default=8, help="Number of galaxies to show")
     p.add_argument("--num-steps", type=int, default=100, help="ODE integration steps (fewer = faster, more = better quality)")
     p.add_argument("--seed", type=int, default=42)
@@ -96,7 +96,7 @@ def main():
         show_image(axes[i, 1], euclid_gen[i],  title="Generated Euclid" if i == 0 else None)
         show_image(axes[i, 2], euclid_real[i], title="Real Euclid"     if i == 0 else None)
 
-    fig.suptitle(f"Euclid x COSMOS — Phase 1 evaluation\n{os.path.basename(args.checkpoint)}", fontsize=10)
+    fig.suptitle(f"Euclid x COSMOS — Phase 1 testing\n{os.path.basename(args.checkpoint)}", fontsize=10)
     plt.tight_layout()
     plt.savefig(args.out, dpi=150, bbox_inches="tight")
     plt.close()
