@@ -20,6 +20,7 @@ Submit on HPC via:
 
 import os
 import sys
+import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
@@ -63,6 +64,7 @@ CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1"
 BATCH_SIZE  = 64
 NUM_WORKERS = 8
 VAL_RATIO   = 0.05
+TEST_RATIO  = 0.1
 NUM_STEPS   = 100_000
 IMAGE_SIZE  = 40      # Euclid cutout spatial size
 LR          = 1e-4
@@ -96,10 +98,18 @@ def main():
 
     dataset   = EuclidCosmosDataset(H5_PATH)
     n_total   = len(dataset)
+    n_test    = int(n_total * TEST_RATIO)
     n_val     = int(n_total * VAL_RATIO)
-    n_train   = n_total - n_val
-    train_ds, val_ds = random_split(dataset, [n_train, n_val])
-    print(f"Dataset: {n_total} pairs → {n_train} train / {n_val} val")
+    n_train   = n_total - n_val - n_test
+    generator = torch.Generator().manual_seed(42)
+    train_ds, val_ds, test_ds = random_split(dataset, [n_train, n_val, n_test], generator=generator)
+    print(f"Dataset: {n_total} pairs → {n_train} train / {n_val} val / {n_test} test")
+
+    # Save test indices so testing.py uses the exact same held-out set
+    os.makedirs(CKPT_DIR, exist_ok=True)
+    test_indices_path = os.path.join(CKPT_DIR, "test_indices.npy")
+    np.save(test_indices_path, np.array(test_ds.indices))
+    print(f"Test indices saved to: {test_indices_path}")
 
     train_loader = DataLoader(
         train_ds,

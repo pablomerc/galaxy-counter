@@ -1,38 +1,39 @@
 """
-Test the trained Euclid x COSMOS flow-matching model.
+Test the trained Euclid x COSMOS flow-matching model on the held-out test set.
 
-Loads a checkpoint, generates Euclid images from COSMOS inputs, and saves a
-figure with rows of: [COSMOS input | Generated Euclid | Real Euclid].
+Loads the test indices saved by train.py, generates Euclid images from COSMOS
+inputs, and reports MSE. Also saves a figure with sample rows:
+    [COSMOS input | Generated Euclid | Real Euclid]
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
-        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-epoch=XX-step=XXXXX.ckpt \
-        --h5 /n03data/fontirro/data_files/euclid_cosmos_pairs.h5 \
-        --out test.png \
-        --n-samples 8
+        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-epoch=00-step=100000.ckpt \
+        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs.h5 \
+        --indices    /n03data/fontirro/checkpoints/euclid-cosmos-phase1/test_indices.npy \
+        --out        /n03data/fontirro/checkpoints/euclid-cosmos-phase1/test_results.png
 """
 
 import os
 import sys
 import argparse
-import torch
 import numpy as np
+import torch
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Subset
 
-sys.path.insert(0, "/n03data/fontirro/galaxy-counter/experiments/euclid-cosmos")
-sys.path.insert(0, "/n03data/fontirro/galaxy-counter/src")
+_here = os.path.dirname(__file__)
+_repo_root = os.path.abspath(os.path.join(_here, "..", ".."))
+sys.path.insert(0, _here)
+sys.path.insert(0, os.path.join(_repo_root, "src"))
 
 from dataset import EuclidCosmosDataset
 from train import EuclidCosmosModel, collate_fn
 
 
 def show_image(ax, img_tensor, title=None):
-    """Display a (1, H, W) or (H, W) tensor as a grayscale image."""
     img = img_tensor.squeeze().cpu().float().numpy()
-    # Robust percentile scaling for display
     vmin, vmax = np.percentile(img, [1, 99])
     ax.imshow(img, cmap="gray", vmin=vmin, vmax=vmax)
     if title:
@@ -42,69 +43,96 @@ def show_image(ax, img_tensor, title=None):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--checkpoint", required=True, help="Path to .ckpt file")
-    p.add_argument("--h5", required=True, help="Path to euclid_cosmos_pairs.h5")
-    p.add_argument("--out", default="test.png", help="Output figure path")
-    p.add_argument("--n-samples", type=int, default=8, help="Number of galaxies to show")
-    p.add_argument("--num-steps", type=int, default=100, help="ODE integration steps (fewer = faster, more = better quality)")
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--checkpoint", required=True)
+    p.add_argument("--h5",         required=True)
+    p.add_argument("--indices",    required=True, help="test_indices.npy saved by train.py")
+    p.add_argument("--out",        default="test_results.png")
+    p.add_argument("--n-plot",     type=int, default=8,   help="Galaxy rows to show in figure")
+    p.add_argument("--batch-size", type=int, default=64)
+    p.add_argument("--num-steps",  type=int, default=100, help="ODE integration steps")
+    p.add_argument("--num-workers",type=int, default=4)
     args = p.parse_args()
 
-    torch.manual_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    print(f"Device: {device}")
 
     # --- Load model ---
     print(f"Loading checkpoint: {args.checkpoint}")
     model = EuclidCosmosModel.load_from_checkpoint(args.checkpoint, map_location=device)
     model.eval()
     model.to(device)
-    print("Model loaded.")
 
-    # --- Load a small subset of the dataset ---
-    dataset = EuclidCosmosDataset(args.h5)
-    # Take n_samples evenly spaced from the dataset for variety
-    indices = np.linspace(0, len(dataset) - 1, args.n_samples, dtype=int)
-    subset = Subset(dataset, indices.tolist())
-    loader = DataLoader(subset, batch_size=args.n_samples, collate_fn=collate_fn)
-    euclid_real, cosmos, sameins, masks, _ = next(iter(loader))
+    # --- Build test dataset from saved indices ---
+    test_indices = np.load(args.indices)
+    print(f"Test set: {len(test_indices)} galaxies")
+    dataset     = EuclidCosmosDataset(args.h5)
+    test_subset = Subset(dataset, test_indices.tolist())
+    loader      = DataLoader(
+        test_subset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        collate_fn=collate_fn,
+    )
 
-    euclid_real = euclid_real.to(device)   # (N, 1, H, W)
-    cosmos      = cosmos.to(device)         # (N, 1, H, W)
-    sameins     = sameins.to(device)        # (N, 1, 1, H, W)
-    masks       = masks.to(device)          # (N, 1)
+    # --- Run inference over the full test set ---
+    all_mse = []
+    plot_euclid_real, plot_euclid_gen, plot_cosmos = [], [], []
 
-    # --- Generate Euclid images from COSMOS ---
-    print(f"Generating {args.n_samples} images ({args.num_steps} ODE steps)...")
+    print("Running inference...")
     with torch.no_grad():
-        euclid_gen = model.sample(
-            cond_image_samegal=cosmos,
-            cond_image_sameins=sameins,
-            masks=masks,
-            num_steps=args.num_steps,
-        )
-    print("Generation done.")
+        for batch_idx, (euclid_real, cosmos, sameins, masks, _) in enumerate(loader):
+            euclid_real = euclid_real.to(device)
+            cosmos      = cosmos.to(device)
+            sameins     = sameins.to(device)
+            masks       = masks.to(device)
 
-    # --- Plot ---
-    n = args.n_samples
+            euclid_gen = model.sample(
+                cond_image_samegal=cosmos,
+                cond_image_sameins=sameins,
+                masks=masks,
+                num_steps=args.num_steps,
+            )
+
+            mse = ((euclid_gen - euclid_real) ** 2).mean(dim=(1, 2, 3))  # (B,)
+            all_mse.append(mse.cpu())
+
+            # Collect samples for the figure (only from first batch)
+            if batch_idx == 0:
+                plot_euclid_real = euclid_real.cpu()
+                plot_euclid_gen  = euclid_gen.cpu()
+                plot_cosmos      = cosmos.cpu()
+
+    all_mse = torch.cat(all_mse)
+    print(f"\n=== Test Results ===")
+    print(f"N test galaxies : {len(all_mse)}")
+    print(f"Mean MSE        : {all_mse.mean():.6f}")
+    print(f"Median MSE      : {all_mse.median():.6f}")
+    print(f"Std MSE         : {all_mse.std():.6f}")
+
+    # --- Figure ---
+    n = min(args.n_plot, len(plot_euclid_real))
     fig, axes = plt.subplots(n, 3, figsize=(7, 2.5 * n))
     if n == 1:
         axes = axes[None, :]
 
-    for i in range(n):
-        show_image(axes[i, 0], cosmos[i],      title="COSMOS input"    if i == 0 else None)
-        show_image(axes[i, 1], euclid_gen[i],  title="Generated Euclid" if i == 0 else None)
-        show_image(axes[i, 2], euclid_real[i], title="Real Euclid"     if i == 0 else None)
+    axes[0, 0].set_title("COSMOS input",     fontsize=9)
+    axes[0, 1].set_title("Generated Euclid", fontsize=9)
+    axes[0, 2].set_title("Real Euclid",      fontsize=9)
 
-    fig.suptitle(f"Euclid x COSMOS — Phase 1 testing\n{os.path.basename(args.checkpoint)}", fontsize=10)
+    for i in range(n):
+        show_image(axes[i, 0], plot_cosmos[i])
+        show_image(axes[i, 1], plot_euclid_gen[i])
+        show_image(axes[i, 2], plot_euclid_real[i])
+
+    fig.suptitle(
+        f"Test set  |  Mean MSE = {all_mse.mean():.5f}  |  N = {len(all_mse)}",
+        fontsize=10,
+    )
     plt.tight_layout()
     plt.savefig(args.out, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"Saved: {args.out}")
-
-    # --- Print basic stats ---
-    mse = torch.mean((euclid_gen - euclid_real) ** 2).item()
-    print(f"Mean pixel MSE (generated vs real): {mse:.6f}")
+    print(f"Figure saved: {args.out}")
 
 
 if __name__ == "__main__":
