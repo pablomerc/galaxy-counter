@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --partition=pscompl
 set -euo pipefail
 
@@ -17,4 +17,4 @@ python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/umap_latent.py
     --checkpoint "${CKPT_DIR}/best-epoch=21-step=98000.ckpt" \
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
     --out        "/n03data/fontirro/plots_model/euclid-cosmos-phase1/umap.png" \
-    --n-samples -1"
+    --n-samples -1
