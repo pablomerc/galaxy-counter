@@ -43,7 +43,9 @@ def main():
                    help="Optional .npy file of indices (e.g. test_indices.npy). "
                         "If omitted, a random sample is used.")
     p.add_argument("--n-samples",  type=int, default=5000,
-                   help="Number of galaxy pairs to encode (ignored if --indices given)")
+                   help="Number of galaxy pairs to encode. Set to -1 to use all pairs (ignored if --indices given)")
+    p.add_argument("--n-highlight", type=int, default=8,
+                   help="Number of random pairs to highlight on encoder_1 plot")
     p.add_argument("--batch-size", type=int, default=256)
     p.add_argument("--num-workers",type=int, default=4)
     p.add_argument("--seed",       type=int, default=42)
@@ -67,9 +69,9 @@ def main():
         indices = np.load(args.indices).tolist()
         print(f"Using {len(indices)} indices from {args.indices}")
     else:
-        n = min(args.n_samples, len(dataset))
+        n = len(dataset) if args.n_samples == -1 else min(args.n_samples, len(dataset))
         indices = np.random.choice(len(dataset), size=n, replace=False).tolist()
-        print(f"Using {n} random samples")
+        print(f"Using {'all' if args.n_samples == -1 else n} samples ({n} pairs)")
 
     subset = Subset(dataset, indices)
     loader = DataLoader(
@@ -116,16 +118,43 @@ def main():
     umap_emb2 = umap.UMAP(**umap_params).fit_transform(all_emb2)
     euc_u2, cos_u2 = umap_emb2[:N], umap_emb2[N:]
 
+    # --- Pick random pairs to highlight ---
+    rng = np.random.default_rng(args.seed)
+    pair_ids = rng.choice(N, size=min(args.n_highlight, N), replace=False)
+    # Use a colormap so each pair gets a unique color
+    pair_colors = plt.cm.tab10(np.linspace(0, 1, len(pair_ids)))
+
     # --- Plot ---
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
     kw = dict(s=4, alpha=0.5, rasterized=True)
     ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F115W", **kw)
+
+    # Highlight selected pairs: both Euclid and COSMOS get the same color and symbol
+    for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
+        label = str(k + 1)
+        ax1.scatter(euc_u1[pid, 0], euc_u1[pid, 1], s=80, color=color,
+                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
+        ax1.scatter(cos_u1[pid, 0], cos_u1[pid, 1], s=80, color=color,
+                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
+        # Label both points with the pair number
+        for x, y in [(euc_u1[pid, 0], euc_u1[pid, 1]),
+                     (cos_u1[pid, 0], cos_u1[pid, 1])]:
+            ax1.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
+                         fontsize=7, color=color, fontweight="bold")
+
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=6, label="Euclid VIS"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=6, label="COSMOS F115W"),
+        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=8,
+               markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
+    ]
+    ax1.legend(handles=legend_handles, fontsize=8)
     ax1.set_title("encoder_1 — same-galaxy (physics)\nEuclid & COSMOS should overlap")
     ax1.set_xlabel("UMAP 1")
     ax1.set_ylabel("UMAP 2")
-    ax1.legend(markerscale=3)
 
     ax2.scatter(euc_u2[:, 0], euc_u2[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax2.scatter(cos_u2[:, 0], cos_u2[:, 1], c="darkorange", label="COSMOS F115W", **kw)
