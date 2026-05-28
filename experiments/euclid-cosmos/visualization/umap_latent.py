@@ -24,14 +24,22 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Subset
 import umap
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 _here = os.path.dirname(__file__)
-_repo_root = os.path.abspath(os.path.join(_here, "..", ".."))
-sys.path.insert(0, _here)
+_experiment_dir = os.path.abspath(os.path.join(_here, ".."))
+_repo_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
+sys.path.insert(0, _experiment_dir)
 sys.path.insert(0, os.path.join(_repo_root, "src"))
 
 from dataset import EuclidCosmosDataset
 from train import EuclidCosmosModel, collate_fn
+
+
+def _percentile_scale(arr):
+    """Clip and rescale a 2-D float array to [0, 1] for display."""
+    lo, hi = np.percentile(arr, 1), np.percentile(arr, 99)
+    return np.clip((arr - lo) / (hi - lo + 1e-8), 0, 1)
 
 
 def main():
@@ -46,6 +54,8 @@ def main():
                    help="Number of galaxy pairs to encode. Set to -1 to use all pairs (ignored if --indices given)")
     p.add_argument("--n-highlight", type=int, default=8,
                    help="Number of random pairs to highlight on encoder_1 plot")
+    p.add_argument("--no-cutouts", action="store_true",
+                   help="Skip galaxy cutout thumbnails (show stars only)")
     p.add_argument("--batch-size", type=int, default=256)
     p.add_argument("--num-workers",type=int, default=4)
     p.add_argument("--seed",       type=int, default=42)
@@ -121,24 +131,55 @@ def main():
     # --- Pick random pairs to highlight ---
     rng = np.random.default_rng(args.seed)
     pair_ids = rng.choice(N, size=min(args.n_highlight, N), replace=False)
-    # Use a colormap so each pair gets a unique color
     pair_colors = plt.cm.tab10(np.linspace(0, 1, len(pair_ids)))
 
+    # Load cutout images for highlighted pairs (unless disabled)
+    if not args.no_cutouts:
+        print("Loading cutout images for highlighted pairs...")
+        hl_euclid_imgs, hl_cosmos_imgs = [], []
+        for pid in pair_ids:
+            e_img, c_img, _ = subset[pid]
+            hl_euclid_imgs.append(_percentile_scale(e_img.squeeze(0).numpy()))
+            hl_cosmos_imgs.append(_percentile_scale(c_img.squeeze(0).numpy()))
+
+    # Spread cutout offset directions evenly around a circle
+    angles = np.linspace(0, 2 * np.pi, len(pair_ids), endpoint=False)
+    offset_dist = 55  # points from the UMAP data point to the cutout box
+
     # --- Plot ---
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
 
     kw = dict(s=4, alpha=0.5, rasterized=True)
     ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F115W", **kw)
 
-    # Highlight selected pairs: both Euclid and COSMOS get the same color and symbol
+    # Add cutout thumbnails first so the star markers render on top
+    if not args.no_cutouts:
+        for k, (pid, color, angle) in enumerate(zip(pair_ids, pair_colors, angles)):
+            dx = offset_dist * np.cos(angle)
+            dy = offset_dist * np.sin(angle)
+            for img, (ux, uy) in [
+                (hl_euclid_imgs[k], (euc_u1[pid, 0], euc_u1[pid, 1])),
+                (hl_cosmos_imgs[k], (cos_u1[pid, 0], cos_u1[pid, 1])),
+            ]:
+                imagebox = OffsetImage(img, cmap="gray", zoom=1.5)
+                ab = AnnotationBbox(
+                    imagebox, (ux, uy),
+                    xybox=(dx, dy),
+                    xycoords="data",
+                    boxcoords="offset points",
+                    bboxprops=dict(edgecolor=color, linewidth=2, boxstyle="square,pad=0.1"),
+                    arrowprops=dict(arrowstyle="->", color=color, lw=1.0),
+                )
+                ax1.add_artist(ab)
+
+    # Highlighted stars on top of cutouts
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
         label = str(k + 1)
         ax1.scatter(euc_u1[pid, 0], euc_u1[pid, 1], s=80, color=color,
                     marker="*", edgecolors="black", linewidths=0.4, zorder=5)
         ax1.scatter(cos_u1[pid, 0], cos_u1[pid, 1], s=80, color=color,
                     marker="*", edgecolors="black", linewidths=0.4, zorder=5)
-        # Label both points with the pair number
         for x, y in [(euc_u1[pid, 0], euc_u1[pid, 1]),
                      (cos_u1[pid, 0], cos_u1[pid, 1])]:
             ax1.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
