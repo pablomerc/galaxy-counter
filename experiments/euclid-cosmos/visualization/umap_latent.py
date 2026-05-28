@@ -56,6 +56,8 @@ def main():
                    help="Number of random pairs to highlight on encoder_1 plot")
     p.add_argument("--no-cutouts", action="store_true",
                    help="Skip galaxy cutout thumbnails (show stars only)")
+    p.add_argument("--out-cutouts", default=None,
+                   help="If given, save a separate figure with the highlighted galaxy cutouts.")
     p.add_argument("--batch-size", type=int, default=256)
     p.add_argument("--num-workers",type=int, default=4)
     p.add_argument("--seed",       type=int, default=42)
@@ -133,8 +135,9 @@ def main():
     pair_ids = rng.choice(N, size=min(args.n_highlight, N), replace=False)
     pair_colors = plt.cm.tab10(np.linspace(0, 1, len(pair_ids)))
 
-    # Load cutout images for highlighted pairs (unless disabled)
-    if not args.no_cutouts:
+    # Load cutout images when needed by either the UMAP overlay or the separate figure
+    need_images = (not args.no_cutouts) or (args.out_cutouts is not None)
+    if need_images:
         print("Loading cutout images for highlighted pairs...")
         hl_euclid_imgs, hl_cosmos_imgs = [], []
         for pid in pair_ids:
@@ -209,6 +212,35 @@ def main():
     plt.savefig(args.out, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"Saved: {args.out}")
+
+    # --- Separate cutouts figure ---
+    if args.out_cutouts is not None:
+        n_pairs = len(pair_ids)
+        fig2, axes = plt.subplots(2, n_pairs, figsize=(2.5 * n_pairs, 5.5))
+        if n_pairs == 1:
+            axes = axes[:, np.newaxis]  # keep 2-D indexing
+
+        row_labels = ["Euclid VIS", "COSMOS F115W"]
+        for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
+            for row, img in enumerate([hl_euclid_imgs[k], hl_cosmos_imgs[k]]):
+                ax = axes[row, k]
+                ax.imshow(img, cmap="gray", origin="lower", vmin=0, vmax=1)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_edgecolor(color)
+                    spine.set_linewidth(3)
+                if row == 0:
+                    ax.set_title(f"Pair {k + 1}", color=color, fontsize=10, fontweight="bold")
+
+        for row, label in enumerate(row_labels):
+            axes[row, 0].set_ylabel(label, fontsize=9)
+
+        fig2.suptitle("Highlighted galaxy cutouts", fontsize=11)
+        plt.tight_layout()
+        plt.savefig(args.out_cutouts, dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"Saved cutouts: {args.out_cutouts}")
 
 
 if __name__ == "__main__":
