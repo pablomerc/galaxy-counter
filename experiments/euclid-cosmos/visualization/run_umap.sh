@@ -5,16 +5,16 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=01:00:00
+#SBATCH --time=05:00:00
 #SBATCH --partition=pscompl
 set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
+CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-phase1"
 
 python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/umap_latent.py \
     --checkpoint "${CKPT_DIR}/best-epoch=21-step=88000.ckpt" \
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
-    --out        "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/umap_val_full_no_cutouts-1.png" \
+    --out        "/n03data/fontirro/plots_model/euclid-cosmos-phase1/umap_val_full_no_cutouts-1.png" \
     --n-samples -1
