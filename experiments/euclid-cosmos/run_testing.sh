@@ -13,11 +13,12 @@ set -euo pipefail
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-phase1"
+PLOT_DIR="/n03data/fontirro/plots_model/euclid-cosmos-phase1"
 
 python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/testing.py \
     --checkpoint "${CKPT_DIR}/best-epoch=21-step=88000.ckpt" \
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
     --indices    "${CKPT_DIR}/test_indices.npy" \
-    --out        "${CKPT_DIR}/test_results.png" \
+    --out        "${PLOT_DIR}/test_results.png" \
     --n-plot     8 \
     --num-steps  100
