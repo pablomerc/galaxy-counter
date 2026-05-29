@@ -116,7 +116,7 @@ def main():
 
     # --- UMAP ---
     umap_params = dict(n_neighbors=15, min_dist=0.1, n_components=2,
-                       metric="euclidean", random_state=args.seed)
+                       metric="euclidean", random_state=args.seed, n_jobs=1)
 
     print("Computing UMAP for encoder_1 (same-galaxy / physics)...")
     all_emb1  = np.concatenate([euclid_emb1, cosmos_emb1], axis=0)

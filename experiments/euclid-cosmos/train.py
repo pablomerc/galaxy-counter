@@ -62,10 +62,10 @@ H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
 CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1"
 
 BATCH_SIZE  = 64
-NUM_WORKERS = 8
+NUM_WORKERS = 16
 VAL_RATIO   = 0.05
 TEST_RATIO  = 0.1
-NUM_STEPS   = 100_000
+NUM_STEPS   = 200_000
 IMAGE_SIZE  = 40      # Euclid cutout spatial size
 LR          = 1e-4
 
