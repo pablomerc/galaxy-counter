@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --gres=gpu:L40S:1
-#SBATCH --time=01:00:00
+#SBATCH --time=05:00:00
 #SBATCH --partition=pscompl
 set -euo pipefail
 
