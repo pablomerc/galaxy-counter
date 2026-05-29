@@ -1,16 +1,20 @@
 """
 Test the trained Euclid x COSMOS flow-matching model on the held-out test set.
 
-Loads the test indices saved by train.py, generates Euclid images from COSMOS
-inputs, and reports MSE. Also saves a figure with sample rows:
-    [COSMOS input | Generated Euclid | Real Euclid]
+Loads the test indices saved by train.py, generates images, and reports MSE.
+Figure columns depend on direction:
+  cosmos-to-euclid (default, trained direction):
+      [COSMOS input | Generated Euclid | Real Euclid]
+  euclid-to-cosmos (reverse, not trained for this — expect poor results):
+      [Euclid input | Generated COSMOS | Real COSMOS]
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
         --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-epoch=00-step=100000.ckpt \
         --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs.h5 \
         --indices    /n03data/fontirro/checkpoints/euclid-cosmos-phase1/test_indices.npy \
-        --out        /n03data/fontirro/checkpoints/euclid-cosmos-phase1/test_results.png
+        --out        /n03data/fontirro/checkpoints/euclid-cosmos-phase1/test_results.png \
+        --direction  cosmos-to-euclid
 """
 
 import os
@@ -47,6 +51,10 @@ def main():
     p.add_argument("--h5",         required=True)
     p.add_argument("--indices",    required=True, help="test_indices.npy saved by train.py")
     p.add_argument("--out",        default="test_results.png")
+    p.add_argument("--direction",  default="cosmos-to-euclid",
+                   choices=["cosmos-to-euclid", "euclid-to-cosmos"],
+                   help="cosmos-to-euclid: trained direction. "
+                        "euclid-to-cosmos: reverse (not trained, expect poor results).")
     p.add_argument("--n-plot",     type=int, default=8,   help="Galaxy rows to show in figure")
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--num-steps",  type=int, default=100, help="ODE integration steps")
@@ -55,6 +63,15 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
+    if device.type == "cuda":
+        print(f"  GPU: {torch.cuda.get_device_name(0)}")
+        print(f"  Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    else:
+        print("  WARNING: no GPU found, running on CPU (will be slow)")
+
+    print(f"Direction: {args.direction}")
+    if args.direction == "euclid-to-cosmos":
+        print("  NOTE: model was trained cosmos-to-euclid — reverse results may be poor.")
 
     # --- Load model ---
     print(f"Loading checkpoint: {args.checkpoint}")
@@ -77,7 +94,7 @@ def main():
 
     # --- Run inference over the full test set ---
     all_mse = []
-    plot_euclid_real, plot_euclid_gen, plot_cosmos = [], [], []
+    plot_input, plot_generated, plot_target = [], [], []
 
     print("Running inference...")
     with torch.no_grad():
@@ -87,46 +104,59 @@ def main():
             sameins     = sameins.to(device)
             masks       = masks.to(device)
 
-            euclid_gen = model.sample(
-                cond_image_samegal=cosmos,
+            if args.direction == "cosmos-to-euclid":
+                cond    = cosmos
+                target  = euclid_real
+            else:
+                # Reverse: condition on Euclid, try to generate COSMOS.
+                # sameins is rebuilt as a (B,1,1,H,W) dummy from the new cond.
+                cond    = euclid_real
+                target  = cosmos
+                sameins = euclid_real.unsqueeze(1)
+
+            generated = model.sample(
+                cond_image_samegal=cond,
                 cond_image_sameins=sameins,
                 masks=masks,
                 num_steps=args.num_steps,
             )
 
-            mse = ((euclid_gen - euclid_real) ** 2).mean(dim=(1, 2, 3))  # (B,)
+            mse = ((generated - target) ** 2).mean(dim=(1, 2, 3))
             all_mse.append(mse.cpu())
 
-            # Collect samples for the figure (only from first batch)
             if batch_idx == 0:
-                plot_euclid_real = euclid_real.cpu()
-                plot_euclid_gen  = euclid_gen.cpu()
-                plot_cosmos      = cosmos.cpu()
+                plot_input     = cond.cpu()
+                plot_generated = generated.cpu()
+                plot_target    = target.cpu()
 
     all_mse = torch.cat(all_mse)
-    print(f"\n=== Test Results ===")
+    print(f"\n=== Test Results ({args.direction}) ===")
     print(f"N test galaxies : {len(all_mse)}")
     print(f"Mean MSE        : {all_mse.mean():.6f}")
     print(f"Median MSE      : {all_mse.median():.6f}")
     print(f"Std MSE         : {all_mse.std():.6f}")
 
     # --- Figure ---
-    n = min(args.n_plot, len(plot_euclid_real))
+    if args.direction == "cosmos-to-euclid":
+        col_titles = ["COSMOS input", "Generated Euclid", "Real Euclid"]
+    else:
+        col_titles = ["Euclid input", "Generated COSMOS", "Real COSMOS"]
+
+    n = min(args.n_plot, len(plot_input))
     fig, axes = plt.subplots(n, 3, figsize=(7, 2.5 * n))
     if n == 1:
         axes = axes[None, :]
 
-    axes[0, 0].set_title("COSMOS input",     fontsize=9)
-    axes[0, 1].set_title("Generated Euclid", fontsize=9)
-    axes[0, 2].set_title("Real Euclid",      fontsize=9)
+    for j, title in enumerate(col_titles):
+        axes[0, j].set_title(title, fontsize=9)
 
     for i in range(n):
-        show_image(axes[i, 0], plot_cosmos[i])
-        show_image(axes[i, 1], plot_euclid_gen[i])
-        show_image(axes[i, 2], plot_euclid_real[i])
+        show_image(axes[i, 0], plot_input[i])
+        show_image(axes[i, 1], plot_generated[i])
+        show_image(axes[i, 2], plot_target[i])
 
     fig.suptitle(
-        f"Test set  |  Mean MSE = {all_mse.mean():.5f}  |  N = {len(all_mse)}",
+        f"Test set ({args.direction})  |  Mean MSE = {all_mse.mean():.5f}  |  N = {len(all_mse)}",
         fontsize=10,
     )
     plt.tight_layout()

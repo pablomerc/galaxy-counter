@@ -11,10 +11,14 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-phase1"
+CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
 
 python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/umap_latent.py \
     --checkpoint "${CKPT_DIR}/best-epoch=21-step=88000.ckpt" \
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
-    --out        "/n03data/fontirro/plots_model/euclid-cosmos-phase1/umap_val_full_no_cutouts-1.png" \
+    --out        "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/umap_val.png" \
     --n-samples -1
+
+TODO: Update checkpoint path. New model is trainning.
+TODO: Do it for both val and test sets. Use the test indices to select the test samples.
+TODO: Print cutouts.

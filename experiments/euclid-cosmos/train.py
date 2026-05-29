@@ -26,6 +26,9 @@ from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Allow running from repo root or from the experiment directory
 _here = os.path.dirname(__file__)
@@ -42,6 +45,13 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
     The base class assumes a wandb logger and 3-channel images; we use a CSV
     logger and 1-channel images, so those hooks are replaced with no-ops.
     """
+
+    def __init__(self, *args, sample_dir=None, n_val_steps=50, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sample_dir = sample_dir
+        self.n_val_steps = n_val_steps
+        self._fixed_val_batch = None
+
     def on_train_start(self) -> None:
         import time
         self._train_start_time = time.time()
@@ -52,8 +62,61 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                 print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
         print(f"{'='*60}\n")
 
+    def validation_step(self, batch, batch_idx):
+        if self._fixed_val_batch is None and batch_idx == 0:
+            euclid, cosmos, sameins, masks, _ = batch
+            n = min(8, euclid.shape[0])
+            self._fixed_val_batch = (
+                euclid[:n].detach().clone(),
+                cosmos[:n].detach().clone(),
+                sameins[:n].detach().clone(),
+                masks[:n].detach().clone(),
+            )
+        return super().validation_step(batch, batch_idx)
+
     def on_validation_epoch_end(self) -> None:
-        pass
+        if self._fixed_val_batch is None or self.sample_dir is None:
+            return
+
+        euclid, cosmos, _, masks = [t.to(self.device) for t in self._fixed_val_batch]
+        os.makedirs(self.sample_dir, exist_ok=True)
+        step = self.trainer.global_step
+        n = euclid.shape[0]
+
+        directions = [
+            ("COSMOS → Euclid", cosmos, euclid, "COSMOS input",  "Generated Euclid", "Real Euclid"),
+            ("Euclid → COSMOS", euclid, cosmos, "Euclid input",  "Generated COSMOS", "Real COSMOS"),
+        ]
+
+        for dir_label, cond, target, t0, t1, t2 in directions:
+            sameins = cond.unsqueeze(1)
+            with torch.no_grad():
+                generated = self.sample(
+                    cond_image_samegal=cond,
+                    cond_image_sameins=sameins,
+                    masks=masks,
+                    num_steps=self.n_val_steps,
+                )
+
+            fig, axes = plt.subplots(n, 3, figsize=(7, 2.5 * n))
+            if n == 1:
+                axes = axes[None, :]
+            for j, title in enumerate([t0, t1, t2]):
+                axes[0, j].set_title(title, fontsize=9)
+            for i in range(n):
+                for j, img in enumerate([cond[i], generated[i], target[i]]):
+                    arr = img.squeeze().cpu().float().numpy()
+                    vmin, vmax = np.percentile(arr, [1, 99])
+                    axes[i, j].imshow(arr, cmap="gray", vmin=vmin, vmax=vmax)
+                    axes[i, j].axis("off")
+
+            tag = dir_label.replace(" ", "").replace("→", "-")
+            fig.suptitle(f"{dir_label}  |  step {step}", fontsize=10)
+            plt.tight_layout()
+            fname = os.path.join(self.sample_dir, f"{tag}_step={step:07d}.png")
+            plt.savefig(fname, dpi=100, bbox_inches="tight")
+            plt.close()
+            print(f"Saved samples: {fname}")
 
 # ---------------------------------------------------------------------------
 # CONFIG — edit before running
@@ -78,25 +141,23 @@ def collate_fn(batch):
     Builds the 5-tuple the model expects:
       (anchor, samegal, sameins, masks, metadata)
 
-    anchor  = Euclid image         (B, 1, H, W)
-    samegal = COSMOS counterpart    (B, 1, H, W)
-    sameins = dummy stand-in (k=1) (B, 1, 1, H, W)  ← same as samegal for now
-    masks   = all True             (B, 1)
+    Direction (which survey is anchor vs condition) is determined by the
+    dataset: even indices → Euclid anchor, odd indices → COSMOS anchor.
     """
-    euclid = torch.stack([b[0] for b in batch])   # (B, 1, H, W)
-    cosmos = torch.stack([b[1] for b in batch])   # (B, 1, H, W)
-    B = euclid.shape[0]
+    anchor = torch.stack([b[0] for b in batch])   # (B, 1, H, W)
+    cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W)
+    B = anchor.shape[0]
 
-    sameins = cosmos.unsqueeze(1)                 # (B, 1, 1, H, W)
-    masks   = torch.ones(B, 1, dtype=torch.bool)
-    metadata = [{"anchor_survey": "euclid", **b[2]} for b in batch]
-    return euclid, cosmos, sameins, masks, metadata
+    sameins  = cond.unsqueeze(1)                  # (B, 1, 1, H, W)
+    masks    = torch.ones(B, 1, dtype=torch.bool)
+    metadata = [b[2] for b in batch]
+    return anchor, cond, sameins, masks, metadata
 
 
 def main():
     pl.seed_everything(42, workers=True)
 
-    dataset   = EuclidCosmosDataset(H5_PATH)
+    dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True)
     n_total   = len(dataset)
     n_test    = int(n_total * TEST_RATIO)
     n_val     = int(n_total * VAL_RATIO)
@@ -132,6 +193,7 @@ def main():
     )
 
     model = EuclidCosmosModel(
+        sample_dir=os.path.join(CKPT_DIR, "samples"),
         in_channels=1,            # Euclid VIS: 1 channel
         cond_channels=1,          # COSMOS F115W: 1 channel
         image_size=IMAGE_SIZE,

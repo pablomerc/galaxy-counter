@@ -42,13 +42,18 @@ class EuclidCosmosDataset(Dataset):
     Lazy-loading dataset for paired Euclid/COSMOS cutouts.
 
     Each sample is one galaxy observed by both instruments.
-    Returns (euclid_img, cosmos_img, metadata) where cosmos_img is the
-    downscaled version matching Euclid's spatial resolution.
+    Returns (anchor, cond, metadata) where:
+      - bidirectional=False (default): anchor=Euclid, cond=COSMOS always.
+      - bidirectional=True: even indices → anchor=Euclid, cond=COSMOS;
+                            odd  indices → anchor=COSMOS, cond=Euclid.
+    metadata["anchor_survey"] tells which survey is the anchor.
     """
 
-    def __init__(self, hdf5_path: str, norm_dict: dict = NORM_DICT):
+    def __init__(self, hdf5_path: str, norm_dict: dict = NORM_DICT,
+                 bidirectional: bool = False):
         self.hdf5_path = hdf5_path
         self.norm_dict = norm_dict
+        self.bidirectional = bidirectional
         self.file = None  # opened lazily, once per worker
 
         with h5py.File(hdf5_path, "r") as f:
@@ -72,8 +77,13 @@ class EuclidCosmosDataset(Dataset):
         euc = (euc - euc_mean) / euc_std
         cos = (cos - cos_mean) / cos_std
 
-        metadata = {"idx": idx}
-        return euc, cos, metadata
+        if self.bidirectional and idx % 2 == 1:
+            anchor, cond, survey = cos, euc, "cosmos"
+        else:
+            anchor, cond, survey = euc, cos, "euclid"
+
+        metadata = {"idx": idx, "anchor_survey": survey}
+        return anchor, cond, metadata
 
 
 def collate_pairs(batch):
