@@ -59,17 +59,17 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
-CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1"
+CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
 VAL_RATIO   = 0.05
 TEST_RATIO  = 0.1
 NUM_STEPS   = 200_000
-IMAGE_SIZE  = 40      # Euclid cutout spatial size
-LR          = 1e-4
+IMAGE_SIZE  = 40      #Euclid cutout spatial size
+LR          = 1e-4    #learning rate for AdamW optimizer
 
-N_GPUS      = 1       # set to number of GPUs on the node
+N_GPUS      = 1       #set to number of GPUs on the node
 # ---------------------------------------------------------------------------
 
 
