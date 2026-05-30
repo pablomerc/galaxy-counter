@@ -22,4 +22,4 @@ python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/testing.py \
     --out        "${PLOT_DIR}/test_results.png" \
     --n-plot     8 \
     --num-steps  100 \
-    --direction "euclid_to_cosmos"
+    --direction "euclid-to-cosmos"
