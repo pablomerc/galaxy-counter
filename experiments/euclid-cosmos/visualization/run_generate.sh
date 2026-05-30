@@ -19,5 +19,5 @@ python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
     --out-dir    "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/generated" \
     --indices    "${CKPT_DIR}/test_indices.npy" \
-    --n-images   16 \
+    --n-images   5 \
     --direction  euclid-to-cosmos
