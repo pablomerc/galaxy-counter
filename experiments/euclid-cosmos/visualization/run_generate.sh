@@ -20,4 +20,4 @@ python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/
     --out-dir    "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/generated" \
     --indices    "${CKPT_DIR}/test_indices.npy" \
     --n-images   5 \
-    --direction  euclid-to-cosmos
+    --direction  both
