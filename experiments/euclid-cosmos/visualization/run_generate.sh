@@ -14,10 +14,10 @@ source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
 
-python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/generate.py \
+python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/generate.py \
     --checkpoint "${CKPT_DIR}/best-epoch=37-step=175000.ckpt" \
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
     --out-dir    "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/generated" \
     --indices    "${CKPT_DIR}/test_indices.npy" \
     --n-images   16 \
-    --direction  both
+    --direction  euclid-to-cosmos
