@@ -18,4 +18,4 @@ python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
     --out        "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/umap_test.png" \
     --out-cutouts "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/umap_test_cutouts.png" \
-    --indices    "${CKPT_DIR}/test_indices.npy"
+    --indices    "${CKPT_DIR}/val_indices.npy"

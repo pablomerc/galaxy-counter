@@ -166,11 +166,12 @@ def main():
     train_ds, val_ds, test_ds = random_split(dataset, [n_train, n_val, n_test], generator=generator)
     print(f"Dataset: {n_total} pairs → {n_train} train / {n_val} val / {n_test} test")
 
-    # Save test indices so testing.py uses the exact same held-out set
+    # Save split indices so evaluation scripts use the exact same sets
     os.makedirs(CKPT_DIR, exist_ok=True)
-    test_indices_path = os.path.join(CKPT_DIR, "test_indices.npy")
-    np.save(test_indices_path, np.array(test_ds.indices))
-    print(f"Test indices saved to: {test_indices_path}")
+    np.save(os.path.join(CKPT_DIR, "test_indices.npy"), np.array(test_ds.indices))
+    np.save(os.path.join(CKPT_DIR, "val_indices.npy"),  np.array(val_ds.indices))
+    print(f"Test indices saved to: {os.path.join(CKPT_DIR, 'test_indices.npy')}")
+    print(f"Val  indices saved to: {os.path.join(CKPT_DIR, 'val_indices.npy')}")
 
     train_loader = DataLoader(
         train_ds,
