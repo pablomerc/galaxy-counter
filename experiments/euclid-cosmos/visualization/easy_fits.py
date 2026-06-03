@@ -1,6 +1,7 @@
 # Easy plot a galaxy pair from the HDF5 file to check they look correct.
 
 import argparse
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
@@ -8,8 +9,7 @@ from astropy.visualization import astropy_mpl_style, ImageNormalize, PercentileI
 
 
 H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
-OUT_PATH = f"/n03data/fontirro/output_plots/pair_{idx}_{id_euc}_{id_cos}.png"
-
+OUT_PATH = "/n03data/fontirro/output_plots/"
 
 def plot_pair(h5_path: str, idx: int, out_path: str):
     with h5py.File(h5_path, "r") as f:
@@ -31,20 +31,23 @@ def plot_pair(h5_path: str, idx: int, out_path: str):
     axes[2].imshow(cos_data, cmap="gray", norm=ImageNormalize(cos_data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
     axes[2].set_title(f"COSMOS  (idx={idx})\n{id_cos}")
     plt.tight_layout()
-    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+
+    out_file = os.path.join(out_path, f"pair_{idx}_{id_euc}_{id_cos}.png")
+
+    plt.savefig(out_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved to {out_path}")
+    print(f"Saved to {out_file}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Plot a galaxy pair from the HDF5 file.")
     parser.add_argument("--h5", default=H5_PATH, help="Path to the HDF5 file")
     parser.add_argument("--idx", type=int, default=0, help="Pair index to plot")
-    parser.add_argument("--out", default=OUT_PATH, help="Output image path")
+    parser.add_argument("--out_path", default=OUT_PATH, help="Directory to save the plot")
     args = parser.parse_args()
 
     print(f"Plotting pair {args.idx} from {args.h5}")
-    plot_pair(args.h5, args.idx, args.out)
+    plot_pair(args.h5, args.idx, args.out_path)
 
 
 if __name__ == "__main__":
