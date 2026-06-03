@@ -12,5 +12,5 @@ set -euo pipefail
 
 
 for idx in $(seq 0 311105); do
-    python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/easy_fits.py --idx $idx --out /n03data/fontirro/output_plots/pair_${idx}.png   
+    python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/easy_fits.py --idx $idx
 done

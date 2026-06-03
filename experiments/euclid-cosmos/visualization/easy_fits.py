@@ -8,7 +8,7 @@ from astropy.visualization import astropy_mpl_style, ImageNormalize, PercentileI
 
 
 H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
-OUT_PATH = "/n03data/fontirro/output_plots/example_pair.png"
+OUT_PATH = f"/n03data/fontirro/output_plots/pair_{{idx}}_{{id_euc}}_{{id_cos}}.png"
 
 
 def plot_pair(h5_path: str, idx: int, out_path: str):
