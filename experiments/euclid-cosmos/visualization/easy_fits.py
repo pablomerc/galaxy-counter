@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 import h5py
 
 H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
+OUT_PATH = "/n03data/fontirro/output_plots/example_pair.png"
 
 
-def plot_pair(h5_path: str, idx: int):
+def plot_pair(h5_path: str, idx: int, out_path: str):
     with h5py.File(h5_path, "r") as f:
         euc_data = f["euclid_images"][idx, 0]
         cos_data = f["cosmos_images_downscaled"][idx, 0]
@@ -21,17 +22,20 @@ def plot_pair(h5_path: str, idx: int):
     axes[1].imshow(cos_data, cmap="gray")
     axes[1].set_title(f"COSMOS  (idx={idx})\n{cos_path}")
     plt.tight_layout()
-    plt.show()
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved to {out_path}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Plot a galaxy pair from the HDF5 file.")
     parser.add_argument("--h5", default=H5_PATH, help="Path to the HDF5 file")
     parser.add_argument("--idx", type=int, default=0, help="Pair index to plot")
+    parser.add_argument("--out", default=OUT_PATH, help="Output image path")
     args = parser.parse_args()
 
     print(f"Plotting pair {args.idx} from {args.h5}")
-    plot_pair(args.h5, args.idx)
+    plot_pair(args.h5, args.idx, args.out)
 
 
 if __name__ == "__main__":
