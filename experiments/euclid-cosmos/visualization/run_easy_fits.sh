@@ -10,7 +10,12 @@
 set -euo pipefail
 
 SCRIPT=/n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/easy_fits.py
-#OUT_DIR=/n03data/fontirro/output_plots
+TOTAL=311106
+CHUNK=1000
 
-seq 0 311105 | parallel -j "$SLURM_CPUS_PER_TASK" \
-    python "$SCRIPT" --idx {}
+python3 -c "
+total, chunk = $TOTAL, $CHUNK
+for s in range(0, total, chunk):
+    print(s, min(s + chunk, total))
+" | parallel -j "$SLURM_CPUS_PER_TASK" --colsep ' ' \
+    python "$SCRIPT" --start {1} --end {2}
