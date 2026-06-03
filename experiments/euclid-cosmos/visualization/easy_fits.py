@@ -16,11 +16,15 @@ def plot_pair(h5_path: str, idx: int, out_path: str):
         euc_path = f["catalog/euclid_paths"][idx].decode()
         cos_path = f["catalog/cosmos_paths"][idx].decode()
 
+
+    id_cos = cos_path.split("/")[-1].replace(".fits", "")
+    id_euc = euc_path.split("/")[-1].split("_")[-2].replace("_cutout.fits", "")
+
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
     axes[0].imshow(euc_data, cmap="gray")
-    axes[0].set_title(f"Euclid  (idx={idx})\n{euc_path}")
+    axes[0].set_title(f"Euclid  (idx={idx})\n{id_euc}")
     axes[1].imshow(cos_data, cmap="gray")
-    axes[1].set_title(f"COSMOS  (idx={idx})\n{cos_path}")
+    axes[1].set_title(f"COSMOS  (idx={idx})\n{id_cos}")
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
