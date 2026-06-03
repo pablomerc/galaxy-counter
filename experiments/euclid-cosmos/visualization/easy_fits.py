@@ -4,6 +4,8 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
+from astropy.visualization import astropy_mpl_style, ImageNormalize, PercentileInterval, AsinhStretch
+
 
 H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
 OUT_PATH = "/n03data/fontirro/output_plots/example_pair.png"
@@ -26,7 +28,7 @@ def plot_pair(h5_path: str, idx: int, out_path: str):
     axes[0].set_title(f"Euclid  (idx={idx})\n{id_euc}")
     axes[1].imshow(cos_data_down, cmap="gray")
     axes[1].set_title(f"COSMOS (downscaled)  (idx={idx})\n{id_cos}")
-    axes[2].imshow(cos_data, cmap="gray")
+    axes[2].imshow(cos_data, cmap="gray", origin="lower", norm=ImageNormalize(cos_data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
     axes[2].set_title(f"COSMOS  (idx={idx})\n{id_cos}")
     plt.tight_layout()
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
