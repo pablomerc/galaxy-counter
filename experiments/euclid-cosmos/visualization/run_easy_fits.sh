@@ -10,7 +10,7 @@
 set -euo pipefail
 
 SCRIPT=/n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/easy_fits.py
-TOTAL=311106
+TOTAL=311107
 CHUNK=1000
 
 python3 -c "
