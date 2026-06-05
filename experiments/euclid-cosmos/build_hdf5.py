@@ -28,7 +28,7 @@ import os
 # CONFIG — edit these before running
 # ---------------------------------------------------------------------------
 
-CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27.csv"  # path to the paired catalog
+CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # path to the paired catalog
 
 EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file path
 COSMOS_COL = "file_cosmos_f115w"            # column name for the COSMOS FITS file path
