@@ -122,8 +122,6 @@ def main():
     print(f"First COSMOS F150W path: {cosmos_paths_f150w[0]}")
     print('test if the first files can be loaded and preprocessed without errors...')
 
-    return 
-
 
 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
@@ -139,7 +137,7 @@ def main():
     with h5py.File(OUTPUT_H5, "w") as f:
         euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
         cos_ds = f.create_dataset("cosmos_images", shape=(N, 2, H_cos, W_cos), dtype=np.float32)
-        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 2, H_euc, W_euc), dtype=np.float32)
+        #cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 2, H_euc, W_euc), dtype=np.float32)
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
@@ -161,7 +159,7 @@ def main():
                     continue
                 euc_ds[i] = euc
                 cos_ds[i] = cos
-                cos_down_ds[i] = cos_down
+                #cos_down_ds[i] = cos_down
 
     print(f"\nDone. {N - skipped}/{N} pairs written to {OUTPUT_H5}")
     if skipped:
