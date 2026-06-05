@@ -83,17 +83,19 @@ def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
 
 
 def process_pair(args: tuple) -> tuple:
-    """Load, preprocess, and downscale one pair. Returns (i, euc, cos, cos_down, error)."""
-    i, ep, cp, h_euc, w_euc = args
+    """Load, preprocess, and downscale one pair. Returns (i, euc, cos, cos_down, error).
+    cos and cos_down are (2, H, W) arrays with F115W and F150W stacked."""
+    i, ep, cp_f115w, cp_f150w, h_euc, w_euc = args
     try:
         euc_tensor = load_fits(ep, EUCLID_HDU)
-        cos_tensor = load_fits(cp, COSMOS_HDU)
+        cos_f115w = preprocess_image_v2(load_fits(cp_f115w, COSMOS_HDU), bands=["F115W"]).squeeze(0).numpy()
+        cos_f150w = preprocess_image_v2(load_fits(cp_f150w, COSMOS_HDU), bands=["F150W"]).squeeze(0).numpy()
         euc = preprocess_image_v2(euc_tensor, bands=["VIS"]).squeeze(0).numpy()
-        cos = preprocess_image_v2(cos_tensor, bands=["F115W"]).squeeze(0).numpy()
+        cos = np.concatenate([cos_f115w, cos_f150w], axis=0)  # (2, H, W)
         cos_down = F.interpolate(
             torch.from_numpy(cos).unsqueeze(0), size=(h_euc, w_euc),
             mode="bilinear", align_corners=False,
-        ).squeeze(0).numpy()
+        ).squeeze(0).numpy()  # (2, H_euc, W_euc)
         return i, euc, cos, cos_down, None
     except Exception as e:
         return i, None, None, None, str(e)
@@ -110,13 +112,14 @@ def main():
     catalog = catalog[mask]
     print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
 
-    euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
-    cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
+    euclid_paths = [os.path.join(EUCLID_DIR_PATH['path_vis'], p) for p in catalog[EUCLID_COL]]
+    cosmos_paths_f115w = [os.path.join(COSMOS_DIR_PATH['path_f115w'], p) for p in catalog[COSMOS_COL]]
+    cosmos_paths_f150w = [os.path.join(COSMOS_DIR_PATH['path_f150w'], p) for p in catalog["file_cosmos_f150w"]]
     N = len(euclid_paths)
 
     print(f"First Euclid path: {euclid_paths[0]}")
-    print(f"First COSMOS path: {cosmos_paths[0]}")
-    print(f"Second COSMOS path: {cosmos_paths[1]}")
+    print(f"First COSMOS F115W path: {cosmos_paths_f115w[0]}")
+    print(f"First COSMOS F150W path: {cosmos_paths_f150w[0]}")
     print('test if the first files can be loaded and preprocessed without errors...')
 
     return 
@@ -124,22 +127,26 @@ def main():
 
 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
-    H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
+    H_cos, W_cos = get_spatial_size(cosmos_paths_f115w[0], COSMOS_HDU)
     print(f"Euclid image size : {H_euc} x {W_euc}")
     print(f"COSMOS image size : {H_cos} x {W_cos}")
 
-    args_list = [(i, ep, cp, H_euc, W_euc) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
+    args_list = [
+        (i, ep, cp115, cp150, H_euc, W_euc)
+        for i, (ep, cp115, cp150) in enumerate(zip(euclid_paths, cosmos_paths_f115w, cosmos_paths_f150w))
+    ]
 
     with h5py.File(OUTPUT_H5, "w") as f:
         euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
-        cos_ds = f.create_dataset("cosmos_images", shape=(N, 1, H_cos, W_cos), dtype=np.float32)
-        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
+        cos_ds = f.create_dataset("cosmos_images", shape=(N, 2, H_cos, W_cos), dtype=np.float32)
+        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 2, H_euc, W_euc), dtype=np.float32)
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
-        cat_grp.create_dataset("cosmos_paths", data=np.array(cosmos_paths, dtype=object), dtype=dt)
+        cat_grp.create_dataset("cosmos_paths_f115w", data=np.array(cosmos_paths_f115w, dtype=object), dtype=dt)
+        cat_grp.create_dataset("cosmos_paths_f150w", data=np.array(cosmos_paths_f150w, dtype=object), dtype=dt)
         f.attrs["num_pairs"] = N
-        f.attrs["num_channels"] = 1
+        f.attrs["num_channels"] = 2
         f.attrs["euclid_shape"] = [H_euc, W_euc]
         f.attrs["cosmos_shape"] = [H_cos, W_cos]
 
