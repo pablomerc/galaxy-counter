@@ -104,7 +104,7 @@ def main():
     print(f"Catalog loaded: {len(catalog)} pairs")
     #print(f"Columns: {list(catalog.columns)}")
 
-    mask = (catalog[EUCLID_EXISTS_COL].all(axis=1)) & (catalog[COSMOS_EXISTS_COL].all(axis=1)) #although the sample already has been checked, I'd like to keep this just to be sure.
+    mask = catalog[EUCLID_EXISTS_COL] & catalog[COSMOS_EXISTS_COL] #although the sample already has been checked, I'd like to keep this just to be sure.
     catalog = catalog[mask]
     print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
 
