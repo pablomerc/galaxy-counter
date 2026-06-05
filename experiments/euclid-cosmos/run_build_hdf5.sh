@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=16        # set NUM_WORKERS in build_hdf5.py to match this
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00
-#SBATCH --partition=comp*
+#SBATCH --partition=compl
 set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
