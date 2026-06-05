@@ -33,7 +33,7 @@ CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # 
 EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file path
 COSMOS_COL = "file_cosmos_f115w"            # column name for the COSMOS FITS file path
 
-EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
+EUCLID_EXISTS_COL = ["cutout_euc_40_vis"]    # boolean column: True if Euclid cutout exists
 COSMOS_EXISTS_COL = ["cutout_cos_120_115w", "cutout_cos_120_150w"]  # boolean column: True if COSMOS cutout exists
 
 EUCLID_DIR_PATH = {
@@ -104,7 +104,9 @@ def main():
     print(f"Catalog loaded: {len(catalog)} pairs")
     #print(f"Columns: {list(catalog.columns)}")
 
-    mask = catalog[EUCLID_EXISTS_COL] & catalog[COSMOS_EXISTS_COL] #although the sample already has been checked, I'd like to keep this just to be sure.
+    euclid_mask = catalog[EUCLID_EXISTS_COL] if isinstance(EUCLID_EXISTS_COL, str) else catalog[EUCLID_EXISTS_COL].all(axis=1)
+    cosmos_mask = catalog[COSMOS_EXISTS_COL] if isinstance(COSMOS_EXISTS_COL, str) else catalog[COSMOS_EXISTS_COL].all(axis=1)
+    mask = euclid_mask & cosmos_mask #although the sample already has been checked, I'd like to keep this just to be sure.
     catalog = catalog[mask]
     print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
 
