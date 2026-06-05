@@ -12,6 +12,7 @@ import torch
 BAND_TO_INDEX = {
     "VIS": 0,
     "F115W": 1
+    "F150W": 2
 }
 # Maximum band center values for HSC and DES bands
 BAND_CENTER_MAX = {
