@@ -53,6 +53,8 @@ OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v2.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
+H_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be downscaled to match Euclid)
+W_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be downscaled to match Euclid)
 # ---------------------------------------------------------------------------
 
 import numpy as np
@@ -83,22 +85,29 @@ def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
 
 
 def process_pair(args: tuple) -> tuple:
-    """Load, preprocess, and downscale one pair. Returns (i, euc, cos, cos_down, error).
+    """Load, preprocess, and downscale one pair. Returns (i, euc, cos, cos_down, euc_up, error).
     cos and cos_down are (2, H, W) arrays with F115W and F150W stacked."""
-    i, ep, cp_f115w, cp_f150w, h_euc, w_euc = args
+    i, ep, cp_f115w, cp_f150w = args
     try:
+
         euc_tensor = load_fits(ep, EUCLID_HDU)
         cos_f115w = preprocess_image_v2(load_fits(cp_f115w, COSMOS_HDU), bands=["F115W"]).squeeze(0).numpy()
         cos_f150w = preprocess_image_v2(load_fits(cp_f150w, COSMOS_HDU), bands=["F150W"]).squeeze(0).numpy()
         euc = preprocess_image_v2(euc_tensor, bands=["VIS"]).squeeze(0).numpy()
         cos = np.concatenate([cos_f115w, cos_f150w], axis=0)  # (2, H, W)
         cos_down = F.interpolate(
-            torch.from_numpy(cos).unsqueeze(0), size=(h_euc, w_euc),
-            mode="bilinear", align_corners=False,
-        ).squeeze(0).numpy()  # (2, H_euc, W_euc)
-        return i, euc, cos, cos_down, None
+            torch.from_numpy(cos).unsqueeze(0), size=(H_SIZE, W_SIZE),
+            mode="area",
+        ).squeeze(0).numpy()  # (2, H_size, W_size)
+        euc_up = F.interpolate(
+            torch.from_numpy(euc).unsqueeze(0), size=(H_SIZE, W_SIZE),
+            mode="bilinear", align_corners=True,
+        ).squeeze(0).numpy()  # (1, H_size, W_size)
+
+        return i, euc, cos, cos_down, euc_up, None
+
     except Exception as e:
-        return i, None, None, None, str(e)
+        return i, None, None, None, None, str(e)
 
 
 def main():
@@ -130,14 +139,15 @@ def main():
     print(f"COSMOS image size : {H_cos} x {W_cos}")
 
     args_list = [
-        (i, ep, cp115, cp150, H_euc, W_euc)
+        (i, ep, cp115, cp150)
         for i, (ep, cp115, cp150) in enumerate(zip(euclid_paths, cosmos_paths_f115w, cosmos_paths_f150w))
     ]
 
     with h5py.File(OUTPUT_H5, "w") as f:
         euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
         cos_ds = f.create_dataset("cosmos_images", shape=(N, 2, H_cos, W_cos), dtype=np.float32)
-        #cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 2, H_euc, W_euc), dtype=np.float32)
+        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 2, H_SIZE, W_SIZE), dtype=np.float32)
+        euc_up_ds = f.create_dataset("euclid_images_upscaled", shape=(N, 1, H_SIZE, W_SIZE), dtype=np.float32)
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
@@ -147,20 +157,21 @@ def main():
         f.attrs["num_channels"] = 2
         f.attrs["euclid_shape"] = [H_euc, W_euc]
         f.attrs["cosmos_shape"] = [H_cos, W_cos]
+        f.attrs["cosmos_downscaled_shape"] = [H_SIZE, W_SIZE]
 
         skipped = 0
         with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
             results = executor.map(process_pair, args_list, chunksize=100)
             for result in tqdm(results, total=N, desc="Processing", mininterval=60, dynamic_ncols=False):
-                i, euc, cos, cos_down, err = result
+                i, euc, cos, cos_down, euc_up, err = result
                 if err:
                     print(f"\n  [WARN] skipping pair {i}: {err}")
                     skipped += 1
                     continue
                 euc_ds[i] = euc
                 cos_ds[i] = cos
-                #cos_down_ds[i] = cos_down
-
+                cos_down_ds[i] = cos_down
+                euc_up_ds[i] = euc_up
     print(f"\nDone. {N - skipped}/{N} pairs written to {OUTPUT_H5}")
     if skipped:
         print(f"  {skipped} pairs skipped due to errors.")
