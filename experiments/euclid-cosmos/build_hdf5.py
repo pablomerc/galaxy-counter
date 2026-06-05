@@ -8,7 +8,7 @@ new_dataset_guide.md.
 
 HDF5 layout:
     euclid_images         — (N, 1, H_euc, W_euc) float32
-    cosmos_images         — (N, 1, H_cos, W_cos) float32
+    cosmos_images         — (N, 2, H_cos, W_cos) float32 #we add now one more filter: F150W
     catalog/euclid_paths  — string array (N,)
     catalog/cosmos_paths  — string array (N,)
     attrs: num_pairs, num_channels, euclid_shape, cosmos_shape
@@ -34,7 +34,7 @@ EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS fi
 COSMOS_COL = "file_cosmos_f115w"            # column name for the COSMOS FITS file path
 
 EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
-COSMOS_EXISTS_COL = "cutout_cos_120_115w"  # boolean column: True if COSMOS cutout exists
+COSMOS_EXISTS_COL = ["cutout_cos_120_115w", "cutout_cos_120_150w"]  # boolean column: True if COSMOS cutout exists
 
 EUCLID_DIR_PATH = { path_vis: "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
 }
@@ -102,7 +102,7 @@ def main():
     print(f"Catalog loaded: {len(catalog)} pairs")
     #print(f"Columns: {list(catalog.columns)}")
 
-    mask = (catalog[EUCLID_EXISTS_COL] == 1) & (catalog[COSMOS_EXISTS_COL] == 1)
+    mask = (catalog[EUCLID_EXISTS_COL].all(axis=1)) & (catalog[COSMOS_EXISTS_COL].all(axis=1)) #although the sample already has been checked, I'd like to keep this just to be sure.
     catalog = catalog[mask]
     print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
 
@@ -110,6 +110,11 @@ def main():
     cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
     N = len(euclid_paths)
 
+    print(f"First Euclid path: {euclid_paths[0]}")
+    print(f"First COSMOS path: {cosmos_paths[0]}")
+    print(f"Second COSMOS path: {cosmos_paths[1]}")
+
+    return 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
     H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
     print(f"Euclid image size : {H_euc} x {W_euc}")
