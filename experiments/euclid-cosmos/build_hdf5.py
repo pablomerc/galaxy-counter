@@ -115,8 +115,12 @@ def main():
     print(f"First Euclid path: {euclid_paths[0]}")
     print(f"First COSMOS path: {cosmos_paths[0]}")
     print(f"Second COSMOS path: {cosmos_paths[1]}")
+    print('test if the first files can be loaded and preprocessed without errors...')
 
     return 
+
+
+
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
     H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
     print(f"Euclid image size : {H_euc} x {W_euc}")
