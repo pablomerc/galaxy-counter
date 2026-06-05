@@ -36,11 +36,13 @@ COSMOS_COL = "file_cosmos_f115w"            # column name for the COSMOS FITS fi
 EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
 COSMOS_EXISTS_COL = ["cutout_cos_120_115w", "cutout_cos_120_150w"]  # boolean column: True if COSMOS cutout exists
 
-EUCLID_DIR_PATH = { path_vis: "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
+EUCLID_DIR_PATH = {
+    'path_vis': "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
 }
 
-COSMOS_DIR_PATH = { path_f115w: "/n03data/fontirro/cosmos/120_cutouts/f115w/",  # base directory for COSMOS F115W cutouts.
-                    path_f150w: "/n03data/fontirro/cosmos/120_cutouts/f150w/"
+COSMOS_DIR_PATH = {
+    'path_f115w': "/n03data/fontirro/cosmos/120_cutouts/f115w/",  # base directory for COSMOS F115W cutouts.
+    'path_f150w': "/n03data/fontirro/cosmos/120_cutouts/f150w/"
 }
 
 
