@@ -131,13 +131,27 @@ def main():
     print(f"First COSMOS F115W path: {cosmos_paths_f115w[0]}")
     print(f"First COSMOS F150W path: {cosmos_paths_f150w[0]}")
 
-    print("\nEuclid FITS structure:")
+    print("\nEuclid FITS structure (first file):")
     with fits.open(euclid_paths[0]) as hdul:
         hdul.info()
         for k, hdu in enumerate(hdul):
             if hdu.data is not None:
                 d = hdu.data.astype(np.float32)
                 print(f"  HDU {k}: shape={d.shape}  range=[{d.min():.4f}, {d.max():.4f}]  nonzero={np.count_nonzero(d)}")
+
+    print("\nSampling Euclid files for zero-data rate:")
+    sample_idx = np.linspace(0, N - 1, min(20, N), dtype=int)
+    zero_count = 0
+    for si in sample_idx:
+        with fits.open(euclid_paths[si]) as hdul:
+            d = hdul[EUCLID_HDU].data.astype(np.float32)
+            nz = np.count_nonzero(d)
+            if nz == 0:
+                zero_count += 1
+    print(f"  {zero_count}/{len(sample_idx)} sampled files are all-zero")
+    if zero_count == len(sample_idx):
+        print("  [WARN] All sampled Euclid files are zero — the cutout files may be empty.")
+        print("  Check EUCLID_HDU or re-examine how the cutouts were generated.")
 
     print("\nTesting first pair (sequential)...")
     _, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair((0, euclid_paths[0], cosmos_paths_f115w[0], cosmos_paths_f150w[0]))
@@ -154,6 +168,8 @@ def main():
     H_cos, W_cos = get_spatial_size(cosmos_paths_f115w[0], COSMOS_HDU)
     print(f"Euclid image size : {H_euc} x {W_euc}")
     print(f"COSMOS image size : {H_cos} x {W_cos}")
+
+    return
 
     args_list = [
         (i, ep, cp115, cp150)
