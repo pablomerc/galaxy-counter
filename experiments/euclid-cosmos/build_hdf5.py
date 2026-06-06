@@ -84,14 +84,6 @@ def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
         data = hdul[hdu].data
     return data.shape[-2], data.shape[-1]
 
-def zero_pix_fraction(img):
-    zeros = np.sum(np.max(img,axis=0)==0.)+np.sum(np.max(img,axis=1)==0.)
-    print('nzeros:',zeros)
-    size = img.shape[0]
-    print('size',size)
-    return zeros/size
-
-
 def process_pair(args: tuple) -> tuple:
     """Load, preprocess, and downscale one pair. Returns (i, euc, cos, cos_down, euc_up, error).
     cos and cos_down are (2, H, W) arrays with F115W and F150W stacked."""
@@ -99,7 +91,7 @@ def process_pair(args: tuple) -> tuple:
     try:
 
         euc_tensor = load_fits(ep, EUCLID_HDU)
-        zero_frac = zero_pix_fraction(euc_tensor.numpy())
+        zero_frac = (euc_tensor == 0).float().mean().item()
         if zero_frac >= 0.10:
             raise ValueError(f"Euclid cutout has {zero_frac:.1%} zero pixels (threshold: 10%)")
         cos_f115w = preprocess_image_v2(load_fits(cp_f115w, COSMOS_HDU), bands=["F115W"]).squeeze(0).numpy()
