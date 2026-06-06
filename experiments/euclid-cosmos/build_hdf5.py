@@ -92,6 +92,9 @@ def process_pair(args: tuple) -> tuple:
     try:
 
         euc_tensor = load_fits(ep, EUCLID_HDU)
+        zero_frac = (euc_tensor == 0).float().mean().item()
+        if zero_frac >= 0.10:
+            raise ValueError(f"Euclid cutout has {zero_frac:.1%} zero pixels (threshold: 10%)")
         cos_f115w = preprocess_image_v2(load_fits(cp_f115w, COSMOS_HDU), bands=["F115W"]).squeeze(0).numpy()
         cos_f150w = preprocess_image_v2(load_fits(cp_f150w, COSMOS_HDU), bands=["F150W"]).squeeze(0).numpy()
         euc = preprocess_image_v2(euc_tensor, bands=["VIS"]).squeeze(0).numpy()
@@ -131,38 +134,20 @@ def main():
     print(f"First COSMOS F115W path: {cosmos_paths_f115w[0]}")
     print(f"First COSMOS F150W path: {cosmos_paths_f150w[0]}")
 
-    print("\nEuclid FITS structure (first file):")
-    with fits.open(euclid_paths[0]) as hdul:
-        hdul.info()
-        for k, hdu in enumerate(hdul):
-            if hdu.data is not None:
-                d = hdu.data.astype(np.float32)
-                print(f"  HDU {k}: shape={d.shape}  range=[{d.min():.4f}, {d.max():.4f}]  nonzero={np.count_nonzero(d)}")
-
-    print("\nSampling Euclid files for zero-data rate:")
-    sample_idx = np.linspace(0, N - 1, min(20, N), dtype=int)
-    zero_count = 0
-    for si in sample_idx:
-        with fits.open(euclid_paths[si]) as hdul:
-            d = hdul[EUCLID_HDU].data.astype(np.float32)
-            nz = np.count_nonzero(d)
-            if nz == 0:
-                zero_count += 1
-    print(f"  {zero_count}/{len(sample_idx)} sampled files are all-zero")
-    if zero_count == len(sample_idx):
-        print("  [WARN] All sampled Euclid files are zero — the cutout files may be empty.")
-        print("  Check EUCLID_HDU or re-examine how the cutouts were generated.")
-
-    print("\nTesting first pair (sequential)...")
-    _, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair((0, euclid_paths[0], cosmos_paths_f115w[0], cosmos_paths_f150w[0]))
-    if t_err:
-        print(f"[ERROR] First pair failed:\n{t_err}")
+    print("\nTesting first valid pair (sequential)...")
+    test_ok = False
+    for test_i in range(min(20, N)):
+        _, t_euc, t_cos, _, t_euc_up, t_err = process_pair(
+            (test_i, euclid_paths[test_i], cosmos_paths_f115w[test_i], cosmos_paths_f150w[test_i])
+        )
+        if t_err is None:
+            print(f"  pair {test_i} — euc [{t_euc.min():.4f}, {t_euc.max():.4f}]  euc_up [{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]")
+            test_ok = True
+            break
+    if not test_ok:
+        print("[ERROR] First 20 pairs all failed — check paths and data.")
         sys.exit(1)
-    print(f"  euc      shape={t_euc.shape}  range=[{t_euc.min():.4f}, {t_euc.max():.4f}]")
-    print(f"  euc_up   shape={t_euc_up.shape}  range=[{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]")
-    print(f"  cos      shape={t_cos.shape}  range=[{t_cos.min():.4f}, {t_cos.max():.4f}]")
-    print(f"  cos_down shape={t_cos_down.shape}  range=[{t_cos_down.min():.4f}, {t_cos_down.max():.4f}]")
-    print("First pair OK.\n")
+    print("First valid pair OK.\n")
 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
     H_cos, W_cos = get_spatial_size(cosmos_paths_f115w[0], COSMOS_HDU)
