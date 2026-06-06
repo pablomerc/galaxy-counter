@@ -137,7 +137,6 @@ def main():
     print("Computing normalization stats...")
     stats = compute_norm_stats(H5_PATH)
 
-    return
 
     print("\nTesting dataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
