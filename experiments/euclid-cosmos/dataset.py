@@ -9,8 +9,8 @@ images are ready for the model.
 HDF5 layout expected (from build_hdf5.py):
     euclid_images                  — (N, 1, H_euc, W_euc) float32
     cosmos_images                  — (N, 2, H_cos, W_cos) float32
-    cosmos_images_downscaled       — (N, 2, H_euc, W_euc) float32
-    euclid_images_upscaled         — (N, 1, H_cos, W_cos) float32
+    cosmos_images_downscaled       — (N, 2, 64, 64) float32
+    euclid_images_upscaled         — (N, 1, 64, 64) float32
     catalog/euclid_paths           — string array (N,)
     catalog/cosmos_paths_f115w     — string array (N,)
     catalog/cosmos_paths_f150w     — string array (N,)
@@ -23,8 +23,8 @@ Usage:
                         num_workers=4, collate_fn=collate_pairs,
                         persistent_workers=True, pin_memory=True)
     # Batch: (euclid_imgs, cosmos_imgs, metadata)
-    # euclid_imgs: (B, 1, H_euc, W_euc)
-    # cosmos_imgs: (B, 1, H_euc, W_euc)  ← downscaled to match Euclid
+    # euclid_imgs: (B, 1, 64, 64)  <- upscaled to match COSMOS size
+    # cosmos_imgs: (B, 2, 64, 64)  <- downscaled to match Euclid size
 """
 
 import h5py
