@@ -131,6 +131,14 @@ def main():
     print(f"First COSMOS F115W path: {cosmos_paths_f115w[0]}")
     print(f"First COSMOS F150W path: {cosmos_paths_f150w[0]}")
 
+    print("\nEuclid FITS structure:")
+    with fits.open(euclid_paths[0]) as hdul:
+        hdul.info()
+        for k, hdu in enumerate(hdul):
+            if hdu.data is not None:
+                d = hdu.data.astype(np.float32)
+                print(f"  HDU {k}: shape={d.shape}  range=[{d.min():.4f}, {d.max():.4f}]  nonzero={np.count_nonzero(d)}")
+
     print("\nTesting first pair (sequential)...")
     _, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair((0, euclid_paths[0], cosmos_paths_f115w[0], cosmos_paths_f150w[0]))
     if t_err:
