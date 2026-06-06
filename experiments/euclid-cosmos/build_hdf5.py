@@ -154,7 +154,7 @@ def main():
     print(f"Euclid image size : {H_euc} x {W_euc}")
     print(f"COSMOS image size : {H_cos} x {W_cos}")
 
-    return
+    
 
     args_list = [
         (i, ep, cp115, cp150)
