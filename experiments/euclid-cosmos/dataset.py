@@ -134,8 +134,10 @@ def main():
 
     H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v2.h5"
 
-    # print("Computing normalization stats...")
-    # stats = compute_norm_stats(H5_PATH)
+    print("Computing normalization stats...")
+    stats = compute_norm_stats(H5_PATH)
+
+    return
 
     print("\nTesting dataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
