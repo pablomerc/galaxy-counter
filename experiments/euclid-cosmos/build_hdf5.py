@@ -178,8 +178,8 @@ def main():
 
         skipped = 0
         with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
-            results = executor.map(process_pair, args_list, chunksize=100)
-            for result in tqdm(results, total=N, desc="Processing", mininterval=60, dynamic_ncols=False):
+            results = executor.map(process_pair, args_list, chunksize=8)
+            for result in tqdm(results, total=N, desc="Processing", mininterval=5, dynamic_ncols=False):
                 i, euc, cos, cos_down, euc_up, err = result
                 if err:
                     print(f"\n  [WARN] skipping pair {i}: {err.strip().splitlines()[-1]}")
