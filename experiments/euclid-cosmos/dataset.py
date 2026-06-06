@@ -34,10 +34,10 @@ from torch.utils.data import Dataset
 
 # Per-survey [mean, std] of preprocessed pixel values.
 NORM_DICT = {
-    "euclid": [0.037, 0.024],
-    "euclid_up": [0.037, 0.024],
-    "cosmos": [0.007, 0.158],
-    "cosmos_ds": [0.007, 0.158],
+    "euclid": [0.019, 0.019],
+    "euclid_up": [0.019, 0.019],
+    "cosmos": [0.041, 0.168],
+    "cosmos_ds": [0.041, 0.121],
 }
 
 
@@ -134,10 +134,8 @@ def main():
 
     H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v2.h5"
 
-    print("Computing normalization stats...")
-    stats = compute_norm_stats(H5_PATH)
-
-    return  # just compute stats and exit; update NORM_DICT with the printed values before training
+    # print("Computing normalization stats...")
+    # stats = compute_norm_stats(H5_PATH)
 
     print("\nTesting dataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
