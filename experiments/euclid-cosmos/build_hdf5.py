@@ -58,6 +58,7 @@ W_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be do
 # ---------------------------------------------------------------------------
 
 import traceback
+import multiprocessing as mp
 import numpy as np
 import pandas as pd
 import h5py
@@ -177,7 +178,7 @@ def main():
         f.attrs["cosmos_downscaled_shape"] = [H_SIZE, W_SIZE]
 
         skipped = 0
-        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        with ProcessPoolExecutor(max_workers=NUM_WORKERS, mp_context=mp.get_context("spawn")) as executor:
             results = executor.map(process_pair, args_list, chunksize=8)
             for result in tqdm(results, total=N, desc="Processing", mininterval=5, dynamic_ncols=False):
                 i, euc, cos, cos_down, euc_up, err = result
