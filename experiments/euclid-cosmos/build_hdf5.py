@@ -57,6 +57,7 @@ H_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be do
 W_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be downscaled to match Euclid)
 # ---------------------------------------------------------------------------
 
+import traceback
 import numpy as np
 import pandas as pd
 import h5py
@@ -106,8 +107,8 @@ def process_pair(args: tuple) -> tuple:
 
         return i, euc, cos, cos_down, euc_up, None
 
-    except Exception as e:
-        return i, None, None, None, None, str(e)
+    except Exception:
+        return i, None, None, None, None, traceback.format_exc()
 
 
 def main():
@@ -129,9 +130,17 @@ def main():
     print(f"First Euclid path: {euclid_paths[0]}")
     print(f"First COSMOS F115W path: {cosmos_paths_f115w[0]}")
     print(f"First COSMOS F150W path: {cosmos_paths_f150w[0]}")
-    print('test if the first files can be loaded and preprocessed without errors...')
 
-
+    print("\nTesting first pair (sequential)...")
+    _, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair((0, euclid_paths[0], cosmos_paths_f115w[0], cosmos_paths_f150w[0]))
+    if t_err:
+        print(f"[ERROR] First pair failed:\n{t_err}")
+        sys.exit(1)
+    print(f"  euc      shape={t_euc.shape}  range=[{t_euc.min():.4f}, {t_euc.max():.4f}]")
+    print(f"  euc_up   shape={t_euc_up.shape}  range=[{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]")
+    print(f"  cos      shape={t_cos.shape}  range=[{t_cos.min():.4f}, {t_cos.max():.4f}]")
+    print(f"  cos_down shape={t_cos_down.shape}  range=[{t_cos_down.min():.4f}, {t_cos_down.max():.4f}]")
+    print("First pair OK.\n")
 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
     H_cos, W_cos = get_spatial_size(cosmos_paths_f115w[0], COSMOS_HDU)
