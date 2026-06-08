@@ -51,19 +51,18 @@ COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
 OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v2.h5"
 
-NUM_WORKERS = 16  # parallel threads for loading + preprocessing
+NUM_WORKERS = 32  # parallel threads for loading + preprocessing
 
 H_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be downscaled to match Euclid)
 W_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be downscaled to match Euclid)
 # ---------------------------------------------------------------------------
 
 import traceback
-import multiprocessing as mp
 import numpy as np
 import pandas as pd
 import h5py
 from astropy.io import fits
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
@@ -199,10 +198,9 @@ def main():
 
         w = 0  # dense write counter
         skipped = 0
-        # fork: workers inherit already-loaded torch/astropy — no re-import cost per worker.
-        # as_completed: results are written as they finish, not blocked on submission order.
-        ctx = mp.get_context("fork")
-        with ProcessPoolExecutor(max_workers=NUM_WORKERS, mp_context=ctx) as executor:
+        # Threads: FITS I/O, numpy, and torch all release the GIL — true parallelism
+        # with no IPC/pickling overhead and no fork-vs-torch deadlock risk.
+        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
             futures = {executor.submit(process_pair, a): a[0] for a in args_list}
             for future in tqdm(as_completed(futures), total=N_valid, desc="Processing", mininterval=5, dynamic_ncols=False):
                 i, euc, cos, cos_down, euc_up, err = future.result()
