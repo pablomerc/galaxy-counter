@@ -9,7 +9,7 @@ import h5py
 from astropy.visualization import ImageNormalize, PercentileInterval, AsinhStretch
 
 H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
-OUT_DIR = "/n03data/fontirro/output_plots/"
+OUT_DIR = "/n03data/fontirro/downsampled_plots_example/"
 
 
 def _render_pair(axes, euc_data, cos_data_down, cos_data, idx, id_euc, id_cos):
