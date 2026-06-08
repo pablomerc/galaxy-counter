@@ -38,3 +38,5 @@ logs/
 .DS_Store
 .vscode/
 .idea/
+memory/MEMORY.md
+memory/feedback_downsampling_mode.md

@@ -63,7 +63,7 @@ import numpy as np
 import pandas as pd
 import h5py
 from astropy.io import fits
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
@@ -72,7 +72,7 @@ from image_preprocessing import preprocess_image_v2
 
 def load_fits(path: str, hdu: int) -> torch.Tensor:
     """Load a FITS file and return a (1, 1, H, W) float32 tensor."""
-    with fits.open(path) as hdul:
+    with fits.open(path, memmap=False) as hdul:
         data = hdul[hdu].data.astype(np.float32)
     if data.ndim == 2:
         data = data[np.newaxis]
@@ -81,13 +81,14 @@ def load_fits(path: str, hdu: int) -> torch.Tensor:
 
 def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
     """Return (H, W) of the first valid file."""
-    with fits.open(path) as hdul:
+    with fits.open(path, memmap=False) as hdul:
         data = hdul[hdu].data
     return data.shape[-2], data.shape[-1]
 
+
 def euclid_zero_frac(path: str) -> float:
     """Return fraction of zero pixels in a Euclid FITS cutout (numpy only, no torch)."""
-    with fits.open(path) as hdul:
+    with fits.open(path, memmap=False) as hdul:
         data = hdul[EUCLID_HDU].data.astype(np.float32)
     return float(np.mean(data == 0))
 
@@ -97,7 +98,6 @@ def process_pair(args: tuple) -> tuple:
     cos and cos_down are (2, H, W) arrays with F115W and F150W stacked."""
     i, ep, cp_f115w, cp_f150w = args
     try:
-
         euc_tensor = load_fits(ep, EUCLID_HDU)
         cos_f115w = preprocess_image_v2(load_fits(cp_f115w, COSMOS_HDU), bands=["F115W"]).squeeze(0).numpy()
         cos_f150w = preprocess_image_v2(load_fits(cp_f150w, COSMOS_HDU), bands=["F150W"]).squeeze(0).numpy()
@@ -199,10 +199,13 @@ def main():
 
         w = 0  # dense write counter
         skipped = 0
-        with ProcessPoolExecutor(max_workers=NUM_WORKERS, mp_context=mp.get_context("spawn")) as executor:
-            results = executor.map(process_pair, args_list, chunksize=8)
-            for result in tqdm(results, total=N_valid, desc="Processing", mininterval=5, dynamic_ncols=False):
-                i, euc, cos, cos_down, euc_up, err = result
+        # fork: workers inherit already-loaded torch/astropy — no re-import cost per worker.
+        # as_completed: results are written as they finish, not blocked on submission order.
+        ctx = mp.get_context("fork")
+        with ProcessPoolExecutor(max_workers=NUM_WORKERS, mp_context=ctx) as executor:
+            futures = {executor.submit(process_pair, a): a[0] for a in args_list}
+            for future in tqdm(as_completed(futures), total=N_valid, desc="Processing", mininterval=5, dynamic_ncols=False):
+                i, euc, cos, cos_down, euc_up, err = future.result()
                 if err:
                     print(f"\n  [WARN] skipping pair {i}: {err.strip().splitlines()[-1]}")
                     skipped += 1
