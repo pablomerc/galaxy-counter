@@ -1,15 +1,13 @@
 """
-TEST!!!!!!!!
-
 Train the flow-matching model on paired Euclid (VIS) x COSMOS (F115W) cutouts.
 
 Phase 1 (this script): simple pairs, no same-instrument neighbors.
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
-  - encoder_2 receives a dummy copy of the COSMOS image (k=1 stand-in).
-    It will be replaced by real Euclid neighbors in Phase 2 after neighbors
-    are computed from the trained model's embeddings.
-  - lambda_geometric=0 because without real Euclid neighbors, the geometric
-    loss has no meaningful signal for encoder_2.
+  - encoder_2 receives a random same-instrument galaxy (k=1 stand-in).
+    It will be replaced by real spatial neighbors in Phase 3 after neighbors
+    are computed.
+  - lambda_geometric=0 because a random galaxy is not a spatial neighbor;
+    enabling the geometric loss here would give encoder_2 a wrong signal.
 
 Run locally (single GPU, for a quick sanity check):
     python experiments/euclid-cosmos/train.py
@@ -122,7 +120,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
+CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase2"
 
 F115W_IDX = 0  # COSMOS F115W channel index in the HDF5 file.
 F150W_IDX = 1  # COSMOS F150W channel index in the HDF5 file.
