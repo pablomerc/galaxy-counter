@@ -124,34 +124,69 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v2.h5"
 CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
 
+F115W_IDX = 0  # COSMOS F115W channel index in the HDF5 file.
+F150W_IDX = 1  # COSMOS F150W channel index in the HDF5 file.
+
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
 VAL_RATIO   = 0.05
 TEST_RATIO  = 0.001
 NUM_STEPS   = 200_000
-IMAGE_SIZE  = 40      #Euclid cutout spatial size
+IMAGE_SIZE  = 64      #Euclid and COSMOS cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
 N_GPUS      = 1       #set to number of GPUs on the node
 # ---------------------------------------------------------------------------
 
 
-def collate_fn(batch):
+class CollateFn:
     """
-    Builds the 5-tuple the model expects:
-      (anchor, samegal, sameins, masks, metadata)
+    Builds the 5-tuple the model expects: (anchor, cond, sameins, masks, metadata).
 
-    Direction (which survey is anchor vs condition) is determined by the
-    dataset: even indices → Euclid anchor, odd indices → COSMOS anchor.
+    sameins is a single random same-instrument image (k=1 stand-in for Phase 1).
+      - Euclid anchor → random Euclid image from the dataset
+      - COSMOS anchor → random COSMOS F115W image from the dataset
+    COSMOS is always sliced to F115W only (channel 0) to match cond_channels=1.
     """
-    anchor = torch.stack([b[0] for b in batch])   # (B, 1, H, W)
-    cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W)
-    B = anchor.shape[0]
 
-    sameins  = cond.unsqueeze(1)                  # (B, 1, 1, H, W)
-    masks    = torch.ones(B, 1, dtype=torch.bool)
-    metadata = [b[2] for b in batch]
-    return anchor, cond, sameins, masks, metadata
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.euc_mean, self.euc_std = dataset.norm_dict["euclid_up"]
+        self.cos_mean, self.cos_std = dataset.norm_dict["cosmos_ds"]
+        self.N = len(dataset)
+
+    def __call__(self, batch):
+        self.dataset._open_file()
+        anchors, conds, sameins_list, metadata = [], [], [], []
+
+        for a, c, meta in batch:
+            rand_idx = torch.randint(self.N, (1,)).item()
+
+            if meta["anchor_survey"] == "cosmos":
+                a = a[F115W_IDX : F115W_IDX + 1]    # same as a[0:1]. (2,H,W) → (1,H,W)
+                rand_img = torch.from_numpy(
+                    self.dataset.file["cosmos_images_downscaled"][rand_idx].copy()
+                )
+                rand_img = (rand_img - self.cos_mean) / self.cos_std
+                sameins_img = rand_img[F115W_IDX : F115W_IDX + 1]   # (1,H,W)
+            else:
+                c = c[F115W_IDX : F115W_IDX + 1]                    # (2,H,W) → (1,H,W)
+                rand_img = torch.from_numpy(
+                    self.dataset.file["euclid_images_upscaled"][rand_idx].copy()
+                )
+                sameins_img = (rand_img - self.euc_mean) / self.euc_std  # (1,H,W)
+
+            anchors.append(a)
+            conds.append(c)
+            sameins_list.append(sameins_img)
+            metadata.append(meta)
+
+        anchor  = torch.stack(anchors)                               # (B, 1, H, W)
+        cond    = torch.stack(conds)                                 # (B, 1, H, W)
+        B       = anchor.shape[0]
+        sameins = torch.stack(sameins_list).unsqueeze(1)             # (B, 1, 1, H, W)
+        masks   = torch.ones(B, 1, dtype=torch.bool)
+        return anchor, cond, sameins, masks, metadata
 
 
 def main():
@@ -178,7 +213,7 @@ def main():
         batch_size=BATCH_SIZE,
         shuffle=True,
         num_workers=NUM_WORKERS,
-        collate_fn=collate_fn,
+        collate_fn=CollateFn(dataset),
         persistent_workers=NUM_WORKERS > 0,
         pin_memory=True,
         drop_last=True,
@@ -188,7 +223,7 @@ def main():
         batch_size=BATCH_SIZE,
         shuffle=False,
         num_workers=NUM_WORKERS,
-        collate_fn=collate_fn,
+        collate_fn=CollateFn(dataset),
         persistent_workers=NUM_WORKERS > 0,
         pin_memory=True,
     )
