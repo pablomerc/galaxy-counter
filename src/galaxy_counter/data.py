@@ -16,19 +16,12 @@ from torch.utils.data._utils.collate import default_collate
 
 
 NORM_DICT = {
-    'hsc': [0.022, 0.05],
-    'legacy': [0.023, 0.063],
-    'legacy_zoom': [0.045, 0.078],
-    'hsc96': [0.00897, 0.0312],
-    'legacy96': [0.0108, 0.050],
-    'legacy96_zoom': [0.0173, 0.053],
+    'euclid': [0.022, 0.05], #TODO:change it to cosmos and euclid values.
+    'cosmos': [0.023, 0.063],
     # 'hsc64': [0.022, 0.05], # TODO: actually measure these (for now using 48x48 stats)
     # 'legacy64': [0.023, 0.063],
     # 'legacy64_zoom': [0.045, 0.078],
 }
-
-# Note: for now the 48x48 stats are used for 64x64 images (TODO: actually measure these)
-
 
 
 # === SUMMARY ===

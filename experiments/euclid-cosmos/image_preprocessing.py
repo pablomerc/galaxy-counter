@@ -11,7 +11,8 @@ import torch
 # Keeps track of the band indices for HSC and DES bands
 BAND_TO_INDEX = {
     "VIS": 0,
-    "F115W": 1
+    "F115W": 1,
+    "F150W": 2
 }
 # Maximum band center values for HSC and DES bands
 BAND_CENTER_MAX = {
@@ -52,12 +53,12 @@ class Clamp:
 
 COSMOS_ZP = 23.9
 
-# Euclid AB zeropoints per filter — verify these for your data release
+# Euclid AB zeropoints per filter — obtained from Euclid's overview webpage.
 EUCLID_ZP = {
-    "VIS": 25.6578,   # TODO: verify for your DR
-    "Y":   25.0,      # TODO: verify for your DR
-    "J":   25.0,      # TODO: verify for your DR
-    "H":   25.0,      # TODO: verify for your DR
+    "VIS": 26.2,
+    "Y":   24.3,   
+    "J":   24.5,   
+    "H":   24.4,      
 }
 
 
@@ -222,7 +223,7 @@ def preprocess_image_v2(
     is_batched = image.ndim == 4
     if not is_batched:
         if image.ndim == 3:
-            image = image.unsqueeze(0)
+            image = image.unsqueeze(0) # (C, H, W) → (1, C, H, W)
         else:
             raise ValueError(f"Image must be 3D or 4D tensor, got shape {image.shape}")
 
@@ -250,18 +251,22 @@ def preprocess_image_v2(
     # clamper = Clamp()
     # processed = clamper(processed.clone(), bands)
 
-    # Rescale (Uses survey string to decide logic)
+    # Rescale each band to COSMOS ZP
+    processed = image.clone()
     rescaler = RescaleToCOSMOS()
-    processed = rescaler.forward(processed.clone(), survey)
+    for i, band in enumerate(bands):
+        processed[:, i, :, :] = rescaler.forward(processed[:, i:i+1, :, :], band)[:, 0, :, :]
 
-    # Range Compress (Defaults)
-    range_compressor = RangeCompress()
-    processed = range_compressor.forward(processed.clone())
+    # Range Compress (asinh)— skip for Euclid (already compressed)
+    is_euclid = any(b in EUCLID_ZP for b in bands)
+    if not is_euclid:
+        range_compressor = RangeCompress()
+        processed = range_compressor.forward(processed.clone())
 
     # 4. Output handling
     # If input was not batched (3D), return 3D. If batched, return 4D.
     if not is_batched:
-        processed = processed.squeeze(0)
+        processed = processed.squeeze(0) # (1, C, H, W) → (C, H, W)
 
     return processed
 
@@ -271,7 +276,7 @@ def main():
     import numpy as np
     from astropy.io import fits
 
-    EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_032_147271e7TILE_101542815_14969272158331464_149.692722_1.968534_1502704970019216576_cutout.fits"
+    EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_013_68b1674fTILE_101544256_14974135090968736_149.741351_2.147102_cutout.fits"
     #COSMOS_FILE = "/n03data/fontirro/cosmos/120_cutouts/F115W_your_galaxy_id.fits"
 
 
@@ -296,19 +301,24 @@ def main():
     print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
     print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
 
-    # Step 4: Range compression
-    range_compression_factor = 0.01
-    mult_factor = 10.0
-    range_compressor = RangeCompress(
-        range_compression_factor=range_compression_factor,
-        mult_factor=mult_factor,
-    )
-    im_range_compressed = range_compressor.forward(im_rescaled.clone())
-    print(f"\n3. After range_compress: {im_range_compressed.shape}")
-    print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
-    print(f"   range_compression_factor: {range_compression_factor}")
-    print(f"   mult_factor: {mult_factor}")
-    print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
+    # Step 4: Range compression (skipped for Euclid — already compressed)
+    is_euclid = band in EUCLID_ZP
+    if not is_euclid:
+        range_compression_factor = 0.01
+        mult_factor = 10.0
+        range_compressor = RangeCompress(
+            range_compression_factor=range_compression_factor,
+            mult_factor=mult_factor,
+        )
+        im_range_compressed = range_compressor.forward(im_rescaled.clone())
+        print(f"\n3. After range_compress: {im_range_compressed.shape}")
+        print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+        print(f"   range_compression_factor: {range_compression_factor}")
+        print(f"   mult_factor: {mult_factor}")
+        print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
+    else:
+        im_range_compressed = im_rescaled
+        print(f"\n3. Range compression skipped (Euclid — already compressed)")
 
     # Summary
     print("\n" + "=" * 60)
@@ -316,7 +326,8 @@ def main():
     print("=" * 60)
     print(f"Original range:    [{im_full.min():.4f}, {im_full.max():.4f}]")
     print(f"Rescaled range:    [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
-    print(f"Range compressed:  [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+    if not is_euclid:
+        print(f"Range compressed:  [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
     print("=" * 60)
 
     # Comparison: preprocess_image_v2 with explicit bands
